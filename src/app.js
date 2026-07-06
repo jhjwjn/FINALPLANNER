@@ -217,6 +217,7 @@ const state = {
   remoteBootstrapped: false,
   lastEventOpen: { id: "", at: 0 },
   aiPromptType: "weekly",
+  searchOpen: false,
   toast: ""
 };
 
@@ -242,70 +243,6 @@ async function seed() {
     await put("settings", { id: "app", theme: "paper", weekStart: "월", focusMode: false, updatedAt: new Date().toISOString() });
   }
   await ensureDefaultCategories();
-  const categories = await all("categories");
-  const cat = (name) => categories.find((c) => c.name === name)?.id || categories[0]?.id;
-  const baseToday = today();
-  if ((await all("schedule_events")).length === 0) {
-    await bulkPut("schedule_events", [
-      eventSeed("전자기학 2장", baseToday, "09:00", "10:30", cat("공부"), 0, "교재 예제 5개"),
-      eventSeed("웨이트", baseToday, "18:30", "19:30", cat("운동"), 1, "하체"),
-      eventSeed("프로젝트 설계", addDays(baseToday, 1), "13:00", "15:00", cat("프로젝트"), 3, "Planner 기능 구조"),
-      eventSeed("독서", addDays(baseToday, 2), "21:00", "21:30", cat("독서"), 2, "회고와 함께"),
-      eventSeed("모의고사 복습", addDays(baseToday, 4), "10:00", "12:00", cat("공부"), 4, "")
-    ]);
-  }
-  if ((await all("schedule_templates")).length === 0) {
-    await bulkPut("schedule_templates", [
-      templateSeed("전자기학 공부", cat("공부"), 0, "기본 90분"),
-      templateSeed("웨이트", cat("운동"), 1, "운동 후 기록"),
-      templateSeed("독서", cat("독서"), 2, "30분 이상"),
-      templateSeed("프로젝트 설계", cat("프로젝트"), 3, "결과물 기준")
-    ]);
-  }
-  if ((await all("tasks")).length === 0) {
-    await bulkPut("tasks", [
-      taskSeed("전자기학 오답 정리", baseToday, "high", cat("공부")),
-      taskSeed("주간 계획 빈 시간 확인", baseToday, "medium", cat("생활")),
-      taskSeed("프로젝트 DB 구조 메모", addDays(baseToday, 1), "medium", cat("프로젝트"))
-    ]);
-  }
-  if ((await all("habits")).length === 0) {
-    await bulkPut("habits", [
-      habitSeed("기상 후 물 마시기", "daily", cat("생활")),
-      habitSeed("운동", "weekly", cat("운동")),
-      habitSeed("독서 20분", "daily", cat("독서")),
-      habitSeed("취침 전 회고", "daily", cat("생활"))
-    ]);
-  }
-  if ((await all("goals")).length === 0) {
-    await bulkPut("goals", [
-      goalSeed("전자기학 핵심 개념 3개 설명 가능", "weekly", "task", "3", cat("공부")),
-      goalSeed("운동 4회 완료", "weekly", "completion", "4", cat("운동")),
-      goalSeed("독서 2챕터 요약", "monthly", "task", "2", cat("독서"))
-    ]);
-  }
-  if ((await all("projects")).length === 0) {
-    const p1 = projectSeed("Planner 앱 완성", cat("프로젝트"));
-    const p2 = projectSeed("개인 루틴 안정화", cat("생활"));
-    await bulkPut("projects", [p1, p2]);
-    await bulkPut("tasks", [
-      taskSeed("오늘 화면 설계 정리", addDays(baseToday, 2), "high", cat("프로젝트"), p1.id),
-      taskSeed("습관 기록 UI 검토", addDays(baseToday, 3), "medium", cat("프로젝트"), p1.id),
-      taskSeed("수면 루틴 시간 고정", addDays(baseToday, 4), "medium", cat("생활"), p2.id)
-    ]);
-  }
-  if ((await all("notes")).length === 0) {
-    await bulkPut("notes", [
-      noteSeed("일정관리 원칙", "계획은 촘촘하게, 실행은 유연하게. 하루 첫 화면은 오늘 실행만 보여줘야 한다.", "원칙"),
-      noteSeed("AI에게 물어볼 것", "이번 주 일정이 목표 달성에 충분한지, 불필요하게 과밀한 구간이 있는지 피드백 받기.", "AI")
-    ]);
-  }
-  if ((await all("dreams")).length === 0) {
-    await bulkPut("dreams", [
-      dreamSeed("1년 뒤의 나", "꾸준한 루틴과 결과물이 쌓인 사람", "career"),
-      dreamSeed("건강한 생활", "수면, 운동, 식사를 무너지지 않게 유지", "life")
-    ]);
-  }
 }
 
 async function ensureDefaultCategories() {
@@ -591,6 +528,7 @@ function appShell() {
       ${actions ? `<section class="actionPanel">${actions}</section>` : ""}
       <section class="content">${renderView()}</section>
     </main>
+    ${renderSearchOverlay()}
     ${renderModal()}
     ${renderTutorial()}
     ${state.toast ? `<div class="toast">${state.toast}</div>` : ""}
@@ -674,6 +612,56 @@ function renderTopActions() {
   if (state.view === "settings") return `<button class="primary" data-action="exportBackup">백업 내보내기</button><button class="soft" data-action="importBackup">백업 가져오기</button><button class="soft" data-action="checkSupabase">연결 확인</button><input class="backupInput" type="file" accept="application/json,.json" hidden>`;
   if (state.view === "ai") return `<button class="primary" data-action="copyPrompt">프롬프트 복사</button>`;
   return "";
+}
+
+function renderSearchOverlay() {
+  const results = searchResults();
+  if (!state.searchOpen && !state.query.trim()) return "";
+  return `<section class="searchOverlay">
+    <div class="searchBox">
+      <label><span>통합 검색</span><input class="globalSearch searchLarge" value="${escapeAttr(state.query)}" placeholder="일정, 목표, 할 일, 메모, 프로젝트 검색"></label>
+      <button class="ghost" data-action="closeSearch">닫기</button>
+    </div>
+    <div class="searchResults">
+      ${results.length ? results.map(searchResultRow).join("") : empty(state.query.trim() ? "검색 결과가 없습니다." : "검색어를 입력하세요.")}
+    </div>
+  </section>`;
+}
+
+function searchResults() {
+  const q = state.query.trim().toLowerCase();
+  if (!q) return [];
+  const collect = [
+    ["일정", "planner", memory.events, (item) => `${item.date} ${item.startTime}-${item.endTime} · ${category(item.categoryId).name}`],
+    ["목표", "goals", memory.goals, (item) => `${item.period} · ${category(item.categoryId).name} · ${goalProgress(item).pct}%`],
+    ["할 일", "tasks", memory.tasks, (item) => `${item.dueDate || "기한 없음"} · ${item.status} · ${category(item.categoryId).name}`],
+    ["습관", "habits", memory.habits, (item) => `${item.rhythm} · ${category(item.categoryId).name}`],
+    ["프로젝트", "projects", memory.projects, (item) => `${item.area} · ${item.status} · ${category(item.categoryId).name}`],
+    ["메모", "notes", memory.notes, (item) => item.tag || "메모"],
+    ["꿈/비전", "dreams", memory.dreams, (item) => `${item.area} · ${item.horizon || ""}`],
+    ["일정사전", "database", memory.templates, (item) => `${category(item.categoryId).name} · ${item.defaultMemo || ""}`]
+  ];
+  return collect.flatMap(([type, view, items, meta]) => items.map((item) => ({ type, view, item, meta: meta(item) })))
+    .filter(({ item, meta }) => [
+      item.name,
+      item.title,
+      item.body,
+      item.memo,
+      item.defaultMemo,
+      item.area,
+      item.status,
+      meta
+    ].filter(Boolean).join(" ").toLowerCase().includes(q))
+    .slice(0, 24);
+}
+
+function searchResultRow(result) {
+  const title = result.item.name || result.item.title || "이름 없음";
+  return `<button class="searchResult" data-search-view="${result.view}" data-search-id="${result.item.id || ""}">
+    <span>${result.type}</span>
+    <b>${escapeHtml(title)}</b>
+    <em>${escapeHtml(result.meta || "")}</em>
+  </button>`;
 }
 
 function renderActions() {
@@ -780,8 +768,13 @@ function renderMonthly() {
 function renderToday() {
   const events = dayEvents(today());
   const tasks = activeTasks().filter((task) => !task.dueDate || task.dueDate <= today()).slice(0, 7);
-  const goals = memory.goals.filter((goal) => goal.status !== "done" && goal.startDate <= today() && goal.endDate >= today());
+  const goals = visibleActiveGoalsForDate(today());
   const focus = nextFocusItem(events, tasks);
+  const notes = memory.notes.slice(-3).reverse();
+  const dreams = memory.dreams.slice(0, 2);
+  const projects = memory.projects.filter((project) => project.status !== "done").slice(0, 3);
+  const weeklyEvents = weekEvents();
+  const monthlyEvents = monthEvents();
   return `
     <div class="todayGrid">
       <section class="heroCard">
@@ -806,8 +799,48 @@ function renderToday() {
         <div class="cardHead"><h3>목표 진행</h3><button data-view="goals">전체 보기</button></div>
         <div class="goalBars">${goals.map(goalBar).join("") || empty("이번 주 목표가 없습니다.")}</div>
       </section>
+      <section class="card hubCard" data-view="planner">
+        <div class="cardHead"><h3>주간계획</h3><button data-view="planner">열기</button></div>
+        <p>${fmtMD(state.weekStart)}-${fmtMD(addDays(state.weekStart, 6))} · 일정 ${weeklyEvents.length}개</p>
+      </section>
+      <section class="card hubCard" data-view="monthly">
+        <div class="cardHead"><h3>월간계획</h3><button data-view="monthly">열기</button></div>
+        <p>${monthLabel(state.monthStart)} · 일정 ${monthlyEvents.length}개</p>
+      </section>
+      <section class="card hubCard" data-view="tasks">
+        <div class="cardHead"><h3>To Do List</h3><button data-view="tasks">열기</button></div>
+        <p>남은 할 일 ${activeTasks().length}개</p>
+      </section>
+      <section class="card hubCard" data-view="habits">
+        <div class="cardHead"><h3>습관</h3><button data-view="habits">열기</button></div>
+        <p>이번 주 체크 ${memory.habits.reduce((sum, habit) => sum + weekDates().filter((date) => habitDone(habit.id, date)).length, 0)}회</p>
+      </section>
+      <section class="card hubCard" data-view="projects">
+        <div class="cardHead"><h3>프로젝트</h3><button data-view="projects">열기</button></div>
+        <div class="miniList">${projects.map((p) => `<span>${escapeHtml(p.name)}</span>`).join("") || "<span>진행 프로젝트 없음</span>"}</div>
+      </section>
+      <section class="card hubCard" data-view="notes">
+        <div class="cardHead"><h3>메모</h3><button data-view="notes">열기</button></div>
+        <div class="miniList">${notes.map((n) => `<span>${escapeHtml(n.title)}</span>`).join("") || "<span>메모 없음</span>"}</div>
+      </section>
+      <section class="card hubCard" data-view="dreams">
+        <div class="cardHead"><h3>꿈 / 비전</h3><button data-view="dreams">열기</button></div>
+        <div class="miniList">${dreams.map((d) => `<span>${escapeHtml(d.title)}</span>`).join("") || "<span>비전 없음</span>"}</div>
+      </section>
+      <section class="card hubCard" data-view="review">
+        <div class="cardHead"><h3>회고</h3><button data-view="review">열기</button></div>
+        <p>완료 일정 ${completedEvents().filter((e) => e.date >= state.weekStart && e.date <= addDays(state.weekStart, 6)).length}개 기준</p>
+      </section>
+      <section class="card hubCard" data-view="ai">
+        <div class="cardHead"><h3>AI 에이전트</h3><button data-view="ai">열기</button></div>
+        <p>계획 피드백, 목표 추천, 회고 프롬프트 생성</p>
+      </section>
     </div>
   `;
+}
+
+function visibleActiveGoalsForDate(date) {
+  return memory.goals.filter((goal) => goal.status !== "done" && goal.startDate <= date && goal.endDate >= date);
 }
 
 function nextFocusItem(events, tasks) {
@@ -825,7 +858,7 @@ function nextFocusItem(events, tasks) {
 
 function renderPlanner() {
   const dates = weekDates();
-  const slots = Array.from({ length: 36 }, (_, i) => ({ hour: 6 + Math.floor(i / 2), minute: i % 2 ? 30 : 0 }));
+  const slots = daySlots();
   const events = queryFiltered(memory.events);
   return `
     <div class="plannerGrid" style="grid-template-columns: 58px repeat(7, 1fr)">
@@ -857,12 +890,8 @@ function renderDashboard() {
       <div class="metric"><span>완료</span><b>${done}</b><em>${events.length ? Math.round(done / events.length * 100) : 0}%</em></div>
       <div class="metric"><span>목표</span><b>${goals.length}</b><em>주간 목표</em></div>
       <section class="card wide2">
-        <div class="cardHead"><h3>가로형 주간 흐름</h3><span>${fmtMD(state.weekStart)} - ${fmtMD(addDays(state.weekStart, 6))}</span></div>
-        <div class="flowBoard">${weekDates().map((date, i) => `
-          <div class="flowDay">
-            <h4>${["월", "화", "수", "목", "금", "토", "일"][i]} <span>${fmtMD(date)}</span></h4>
-            ${events.filter((e) => e.date === date).map(eventPill).join("") || "<p class='muted'>비어 있음</p>"}
-          </div>`).join("")}</div>
+        <div class="cardHead"><h3>가로형 주간 타임라인</h3><span>${fmtMD(state.weekStart)} - ${fmtMD(addDays(state.weekStart, 6))}</span></div>
+        ${renderWeeklyTimeline(events)}
       </section>
       <section class="card wide">
         <div class="cardHead"><h3>목표 게이지</h3><span>완료 기준</span></div>
@@ -880,10 +909,33 @@ function renderDashboard() {
   `;
 }
 
+function renderWeeklyTimeline(events) {
+  const dates = weekDates();
+  const days = ["월", "화", "수", "목", "금", "토", "일"];
+  const hourLabels = Array.from({ length: 24 }, (_, hour) => `<div class="timelineHour" style="grid-column: span 2">${pad(hour)}:00</div>`).join("");
+  return `<div class="weekTimeline" style="grid-template-columns: 72px repeat(48, minmax(18px, 1fr))">
+    <div class="timelineCorner"></div>${hourLabels}
+    ${dates.map((date, index) => {
+      const dayEventsValue = events.filter((event) => event.date === date);
+      return `<div class="timelineDayLabel">${days[index]}<span>${fmtMD(date)}</span></div>
+        <div class="timelineRow" style="grid-column: span 48">
+          ${Array.from({ length: 48 }, (_, i) => `<i class="${i % 2 === 0 ? "hour" : "half"}"></i>`).join("")}
+          ${dayEventsValue.map((event) => {
+            const start = Math.max(0, Math.floor(minutes(event.startTime) / 30));
+            const span = Math.max(1, Math.ceil(duration(event.startTime, event.endTime) / 30));
+            return `<button class="timelineEvent" style="--event:${color(event.colorIndex)}; grid-column:${start + 1} / span ${span}" data-event="${event.id}">
+              <b>${escapeHtml(event.name)}</b><span>${event.startTime}-${event.endTime}</span>
+            </button>`;
+          }).join("")}
+        </div>`;
+    }).join("")}
+  </div>`;
+}
+
 function renderDaily() {
   const dates = weekDates();
   const events = dayEvents(state.selectedDate);
-  const slots = Array.from({ length: 36 }, (_, i) => ({ hour: 6 + Math.floor(i / 2), minute: i % 2 ? 30 : 0 }));
+  const slots = daySlots();
   return `
     <div class="dailyWrap">
       <div class="dayPicker">${dates.map((date, index) => `<button class="${state.selectedDate === date ? "active" : ""}" data-day="${date}">${["월", "화", "수", "목", "금", "토", "일"][index]}<span>${fmtMD(date)}</span></button>`).join("")}</div>
@@ -896,6 +948,10 @@ function renderDaily() {
       </div>
     </div>
   `;
+}
+
+function daySlots() {
+  return Array.from({ length: 48 }, (_, i) => ({ hour: Math.floor(i / 2), minute: i % 2 ? 30 : 0 }));
 }
 
 function renderTasks() {
@@ -1244,15 +1300,15 @@ function buildPrompt(type) {
   const projects = memory.projects.map((p) => `- ${p.name}: ${p.status}, ${p.area}, ${category(p.categoryId).name}`).join("\n");
   const notes = memory.notes.slice(-6).map((n) => `- ${n.title}: ${n.body}`).join("\n");
   const dreams = memory.dreams.map((d) => `- ${d.title}: ${d.area}, ${d.body}`).join("\n");
-  const base = `너는 개인 일정/습관/목표를 분석하는 플래너 코치다. 뻔한 조언 말고, 내 데이터에서 근거를 뽑아 실행 순서까지 제안해라.\n\n[이번 주 요약]\n${byDay}\n\n[카테고리 분포]\n${byCategory || "없음"}\n\n[이번 주 일정 원본]\n${events || "없음"}\n\n[목표]\n${goals || "없음"}\n\n[습관]\n${habits || "없음"}`;
-  if (type === "overload") return `${base}\n\n요청: 과부하 진단을 해라.\n1. 하루별/시간대별로 무리한 구간을 찾아라.\n2. 일정 사이 회복 시간이 부족한 곳을 찾아라.\n3. 미루거나 줄여야 할 일정을 3개까지 골라라.\n4. 바꾼 뒤의 권장 일정 배치를 구체적인 시간으로 제안해라.`;
-  if (type === "goal") return `${base}\n\n[일정사전]\n${templates || "없음"}\n\n요청: 다음 주에 세울 만한 목표를 추천해라.\n1. 내 반복 패턴과 일정사전에서 후보를 뽑아라.\n2. 목표는 횟수/시간/진도 중 무엇으로 측정할지 정해라.\n3. 너무 쉬운 목표, 너무 무리한 목표를 구분해라.\n4. 최종 추천 목표 5개와 그 이유를 써라.`;
-  if (type === "habit") return `${base}\n\n요청: 습관 실패 원인을 찾아라.\n1. 어떤 습관이 일정 구조상 실패하기 쉬운지 분석해라.\n2. 실패 원인을 의지 문제가 아니라 시간/환경/트리거 문제로 설명해라.\n3. 각 습관별로 가장 작은 대체 행동을 제안해라.\n4. 내 일정에 맞는 실행 시간대를 추천해라.`;
-  if (type === "taskPlan") return `${base}\n\n[할 일]\n${tasks || "없음"}\n\n요청: 할 일을 캘린더에 배치하는 전략을 세워라.\n1. 오늘/이번 주 안에 처리해야 할 것을 우선순위로 정렬해라.\n2. 각 할 일에 필요한 집중도와 적정 시간대를 추정해라.\n3. 기존 일정과 충돌하지 않는 배치안을 만들어라.\n4. 버려도 되는 할 일과 반드시 해야 하는 할 일을 나눠라.`;
-  if (type === "review") return `${base}\n\n[완료 일정]\n${doneEvents.map((e) => `- ${e.date} ${e.name}`).join("\n") || "없음"}\n[미완료 일정]\n${pendingEvents.map((e) => `- ${e.date} ${e.name}`).join("\n") || "없음"}\n\n요청: 주간 회고 초안을 만들어라.\n1. 잘한 점 3개, 병목 3개를 데이터 근거와 함께 써라.\n2. 다음 주에 유지할 것/버릴 것/실험할 것을 나눠라.\n3. 회고 문장으로 바로 복사할 수 있게 작성해라.`;
-  if (type === "monthly") return `${base}\n\n[프로젝트]\n${projects || "없음"}\n\n요청: 월간 방향 점검을 해라.\n1. 이번 주 계획이 월간 방향에 도움이 되는지 평가해라.\n2. 비중이 과한 카테고리와 부족한 카테고리를 말해라.\n3. 다음 4주 동안 가져갈 루틴/목표/프로젝트 우선순위를 제안해라.`;
-  if (type === "dream") return `${base}\n\n[꿈/비전]\n${dreams || "없음"}\n[최근 메모]\n${notes || "없음"}\n\n요청: 장기 비전과 이번 주 실행 사이의 간극을 분석해라.\n1. 비전과 연결되는 현재 행동을 찾아라.\n2. 비전과 무관하게 시간을 쓰는 영역을 찾아라.\n3. 이번 주 안에 할 수 있는 작은 액션 5개를 제안해라.`;
-  return `${base}\n\n요청: 이번 주 계획 피드백을 해라.\n1. 현실성, 과밀 시간대, 목표 달성 가능성을 각각 점수화해라.\n2. 일정의 순서가 이상한 부분을 찾아라.\n3. 지금 상태에서 가장 효과가 큰 수정 5개를 제안해라.\n4. 수정 후 예상되는 하루 흐름을 간단히 예시로 보여줘라.`;
+  const intro = "너는 개인 일정/습관/목표를 분석하는 플래너 코치다. 뻔한 조언 말고, 내 데이터에서 근거를 뽑아 실행 순서까지 제안해라.";
+  if (type === "overload") return `${intro}\n\n[이번 주 요약]\n${byDay}\n\n[이번 주 일정 원본]\n${events || "없음"}\n\n요청: 과부하 진단을 해라.\n1. 하루별/시간대별로 무리한 구간을 찾아라.\n2. 일정 사이 회복 시간이 부족한 곳을 찾아라.\n3. 미루거나 줄여야 할 일정을 3개까지 골라라.\n4. 바꾼 뒤의 권장 일정 배치를 구체적인 시간으로 제안해라.`;
+  if (type === "goal") return `${intro}\n\n[현재 목표]\n${goals || "없음"}\n\n[일정사전]\n${templates || "없음"}\n\n[최근 프로젝트]\n${projects || "없음"}\n\n요청: 다음 주에 세울 만한 목표를 추천해라.\n1. 내 반복 패턴과 일정사전에서 후보를 뽑아라.\n2. 목표는 횟수/시간/진도 중 무엇으로 측정할지 정해라.\n3. 너무 쉬운 목표, 너무 무리한 목표를 구분해라.\n4. 최종 추천 목표 5개와 그 이유를 써라.`;
+  if (type === "habit") return `${intro}\n\n[습관]\n${habits || "없음"}\n\n[이번 주 요약]\n${byDay}\n\n[방해 가능 일정]\n${events || "없음"}\n\n요청: 습관 실패 원인을 찾아라.\n1. 어떤 습관이 일정 구조상 실패하기 쉬운지 분석해라.\n2. 실패 원인을 의지 문제가 아니라 시간/환경/트리거 문제로 설명해라.\n3. 각 습관별로 가장 작은 대체 행동을 제안해라.\n4. 내 일정에 맞는 실행 시간대를 추천해라.`;
+  if (type === "taskPlan") return `${intro}\n\n[할 일]\n${tasks || "없음"}\n\n[기존 일정]\n${events || "없음"}\n\n요청: 할 일을 캘린더에 배치하는 전략을 세워라.\n1. 오늘/이번 주 안에 처리해야 할 것을 우선순위로 정렬해라.\n2. 각 할 일에 필요한 집중도와 적정 시간대를 추정해라.\n3. 기존 일정과 충돌하지 않는 배치안을 만들어라.\n4. 버려도 되는 할 일과 반드시 해야 하는 할 일을 나눠라.`;
+  if (type === "review") return `${intro}\n\n[완료 일정]\n${doneEvents.map((e) => `- ${e.date} ${e.name}`).join("\n") || "없음"}\n\n[미완료 일정]\n${pendingEvents.map((e) => `- ${e.date} ${e.name}`).join("\n") || "없음"}\n\n[목표]\n${goals || "없음"}\n\n요청: 주간 회고 초안을 만들어라.\n1. 잘한 점 3개, 병목 3개를 데이터 근거와 함께 써라.\n2. 다음 주에 유지할 것/버릴 것/실험할 것을 나눠라.\n3. 회고 문장으로 바로 복사할 수 있게 작성해라.`;
+  if (type === "monthly") return `${intro}\n\n[카테고리 분포]\n${byCategory || "없음"}\n\n[목표]\n${goals || "없음"}\n\n[프로젝트]\n${projects || "없음"}\n\n요청: 월간 방향 점검을 해라.\n1. 이번 주 계획이 월간 방향에 도움이 되는지 평가해라.\n2. 비중이 과한 카테고리와 부족한 카테고리를 말해라.\n3. 다음 4주 동안 가져갈 루틴/목표/프로젝트 우선순위를 제안해라.`;
+  if (type === "dream") return `${intro}\n\n[꿈/비전]\n${dreams || "없음"}\n\n[최근 메모]\n${notes || "없음"}\n\n[프로젝트]\n${projects || "없음"}\n\n요청: 장기 비전과 이번 주 실행 사이의 간극을 분석해라.\n1. 비전과 연결되는 현재 행동을 찾아라.\n2. 비전과 무관하게 시간을 쓰는 영역을 찾아라.\n3. 이번 주 안에 할 수 있는 작은 액션 5개를 제안해라.`;
+  return `${intro}\n\n[이번 주 요약]\n${byDay}\n\n[카테고리 분포]\n${byCategory || "없음"}\n\n[이번 주 일정 원본]\n${events || "없음"}\n\n[목표]\n${goals || "없음"}\n\n요청: 이번 주 계획 피드백을 해라.\n1. 현실성, 과밀 시간대, 목표 달성 가능성을 각각 점수화해라.\n2. 일정의 순서가 이상한 부분을 찾아라.\n3. 지금 상태에서 가장 효과가 큰 수정 5개를 제안해라.\n4. 수정 후 예상되는 하루 흐름을 간단히 예시로 보여줘라.`;
 }
 
 async function handleSubmit(event) {
@@ -1381,11 +1437,32 @@ async function refresh(toast = "") {
 function render(focusSearch = false) {
   $("#app").innerHTML = appShell();
   if (focusSearch) {
-    const input = $(".globalSearch");
+    const input = $(".searchLarge") || $(".globalSearch");
     if (input) {
       input.focus();
       input.setSelectionRange(input.value.length, input.value.length);
     }
+  }
+}
+
+function syncSearchInputs() {
+  $$(".globalSearch").forEach((input) => {
+    if (document.activeElement !== input) input.value = state.query;
+  });
+}
+
+function renderSearchResultsOnly() {
+  const overlay = $(".searchOverlay");
+  if (!overlay) {
+    render(true);
+    return;
+  }
+  const results = overlay.querySelector(".searchResults");
+  if (results) {
+    const values = searchResults();
+    results.innerHTML = values.length
+      ? values.map(searchResultRow).join("")
+      : empty(state.query.trim() ? "검색 결과가 없습니다." : "검색어를 입력하세요.");
   }
 }
 
@@ -1569,6 +1646,7 @@ document.addEventListener("click", async (event) => {
     render();
     return;
   }
+  const viewElement = event.target.closest("[data-view]");
   const target = event.target.closest("button");
   if (target?.dataset.action === "nextTutorial") {
     state.tutorialStep += 1;
@@ -1648,9 +1726,30 @@ document.addEventListener("click", async (event) => {
       return;
     }
   }
+  if (!target && viewElement?.dataset.view) {
+    state.view = viewElement.dataset.view;
+    state.searchOpen = false;
+    render();
+    return;
+  }
   if (!target) return;
   if (target.dataset.view) {
     state.view = target.dataset.view;
+    state.searchOpen = false;
+    render();
+    return;
+  }
+  if (target.dataset.searchView) {
+    state.view = target.dataset.searchView;
+    state.searchOpen = false;
+    state.query = "";
+    if (target.dataset.searchView === "database") state.dataTab = "events";
+    render();
+    return;
+  }
+  if (target.dataset.action === "closeSearch") {
+    state.searchOpen = false;
+    state.query = "";
     render();
     return;
   }
@@ -1887,7 +1986,9 @@ document.addEventListener("input", (event) => {
   if (event.target.matches(".globalSearch")) {
     if (state.isComposing || event.isComposing) return;
     state.query = event.target.value;
-    render(true);
+    state.searchOpen = true;
+    syncSearchInputs();
+    renderSearchResultsOnly();
     return;
   }
   if (state.modal === "event" && event.target.matches('.modal input[name="name"]')) {
@@ -1914,7 +2015,15 @@ document.addEventListener("compositionend", (event) => {
   if (!event.target.matches(".globalSearch")) return;
   state.isComposing = false;
   state.query = event.target.value;
-  render(true);
+  state.searchOpen = true;
+  syncSearchInputs();
+  renderSearchResultsOnly();
+});
+
+document.addEventListener("focusin", (event) => {
+  if (!event.target.matches(".globalSearch")) return;
+  state.searchOpen = true;
+  if (!$(".searchOverlay")) render(true);
 });
 
 document.addEventListener("change", (event) => {
