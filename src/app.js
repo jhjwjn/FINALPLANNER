@@ -190,6 +190,7 @@ const navItems = [
   ["review", "회고"],
   ["dreams", "꿈/비전"],
   ["database", "데이터"],
+  ["print", "출력"],
   ["settings", "설정"],
   ["ai", "AI"]
 ];
@@ -217,6 +218,7 @@ const state = {
   remoteBootstrapped: false,
   lastEventOpen: { id: "", at: 0 },
   aiPromptType: "weekly",
+  printItems: ["planner", "dashboard", "daily"],
   searchOpen: false,
   toast: ""
 };
@@ -533,11 +535,11 @@ function appShell() {
         </div>
         <div class="topSearch"><input class="globalSearch" value="${escapeAttr(state.query)}" placeholder="일정, 목표, 할 일, 메모 검색"></div>
         <div class="topActions">${renderTopActions()}</div>
+        ${renderSearchOverlay()}
       </header>
       ${actions ? `<section class="actionPanel">${actions}</section>` : ""}
       <section class="content">${renderView()}</section>
     </main>
-    ${renderSearchOverlay()}
     ${renderModal()}
     ${renderTutorial()}
     ${state.toast ? `<div class="toast">${state.toast}</div>` : ""}
@@ -600,6 +602,7 @@ function viewTitle() {
     review: "회고",
     dreams: "꿈 / 비전",
     database: "데이터베이스",
+    print: "출력",
     settings: "환경 설정",
     ai: "AI 에이전트"
   })[state.view];
@@ -608,8 +611,8 @@ function viewTitle() {
 function renderTopActions() {
   const weekNav = `<button class="ghost" data-action="prevWeek">이전주</button><button class="ghost" data-action="thisWeek">이번주</button><button class="ghost" data-action="nextWeek">다음주</button>`;
   if (state.view === "today") return `<button class="primary" data-modal="quickAdd">빠른 추가</button><button class="soft" data-modal="note">빠른 메모</button>`;
-  if (["planner", "dashboard", "daily"].includes(state.view)) return `${weekNav}<button class="primary" data-modal="event">일정 추가</button><button class="soft" data-action="openPrint">출력</button>`;
-  if (state.view === "monthly") return `<button class="ghost" data-action="prevMonth">이전달</button><button class="ghost" data-action="thisMonth">이번달</button><button class="ghost" data-action="nextMonth">다음달</button><button class="primary" data-modal="event">일정 추가</button><button class="soft" data-action="openPrint">출력</button>`;
+  if (["planner", "dashboard", "daily"].includes(state.view)) return `${weekNav}<button class="primary" data-modal="event">일정 추가</button>`;
+  if (state.view === "monthly") return `<button class="ghost" data-action="prevMonth">이전달</button><button class="ghost" data-action="thisMonth">이번달</button><button class="ghost" data-action="nextMonth">다음달</button><button class="primary" data-modal="event">일정 추가</button>`;
   if (state.view === "tasks") return `<button class="primary" data-modal="task">할 일 추가</button>`;
   if (state.view === "habits") return `<button class="primary" data-modal="habit">습관 추가</button>`;
   if (state.view === "goals") return `<button class="primary" data-modal="goal">목표 추가</button>`;
@@ -618,6 +621,7 @@ function renderTopActions() {
   if (state.view === "review") return `<button class="primary" data-modal="review">회고 작성</button>`;
   if (state.view === "dreams") return `<button class="primary" data-modal="dream">비전 추가</button>`;
   if (state.view === "database") return `<button class="primary" data-modal="template">일정사전 추가</button><button class="soft" data-modal="category">카테고리</button>`;
+  if (state.view === "print") return `<button class="primary" data-action="printSelected">선택 항목 출력</button>`;
   if (state.view === "settings") return `<button class="primary" data-action="exportBackup">백업 내보내기</button><button class="soft" data-action="importBackup">백업 가져오기</button><button class="soft" data-action="checkSupabase">연결 확인</button><input class="backupInput" type="file" accept="application/json,.json" hidden>`;
   if (state.view === "ai") return `<button class="primary" data-action="copyPrompt">프롬프트 복사</button>`;
   return "";
@@ -751,6 +755,7 @@ function renderView() {
   if (state.view === "review") return renderReview();
   if (state.view === "dreams") return renderDreams();
   if (state.view === "database") return renderDatabase();
+  if (state.view === "print") return renderPrint();
   if (state.view === "settings") return renderSettings();
   if (state.view === "ai") return renderAI();
   return "";
@@ -927,7 +932,10 @@ function renderWeeklyTimeline(events) {
   const endMinute = 25 * 60 + 30;
   const slots = Math.ceil((endMinute - startMinute) / 30);
   const hours = Array.from({ length: Math.ceil(slots / 2) }, (_, index) => (7 + index) % 24);
-  const hourLabels = hours.map((hour) => `<div class="timelineHour" style="grid-column: span 2">${pad(hour)}:00</div>`).join("");
+  const hourLabels = hours.map((hour, index) => {
+    const span = index === hours.length - 1 && slots % 2 ? 1 : 2;
+    return `<div class="timelineHour" style="grid-column: span ${span}">${pad(hour)}:00</div>`;
+  }).join("");
   return `<div class="weekTimeline" style="grid-template-columns: 48px repeat(${slots}, minmax(20px, 1fr)); --slots:${slots}">
     <div class="timelineCorner"></div>${hourLabels}
     ${dates.map((date, index) => {
@@ -1104,6 +1112,57 @@ function renderDatabase() {
   </section></div>`;
 }
 
+function printOptions() {
+  return [
+    ["today", "오늘", "오늘 실행, 타임라인, 목표 요약"],
+    ["planner", "주간계획", "세로형 주간 캘린더"],
+    ["dashboard", "주간대시보드", "가로형 주간 타임라인과 목표 게이지"],
+    ["daily", "일간", "선택 날짜 일간 계획표"],
+    ["monthly", "월간계획", "월간 캘린더"],
+    ["tasks", "To Do List", "할 일 칸반"],
+    ["habits", "습관", "습관 체크 표"],
+    ["goals", "목표", "목표 카드와 진행률"],
+    ["projects", "프로젝트", "프로젝트 진행"],
+    ["notes", "메모", "메모 목록"],
+    ["review", "회고", "회고 요약"],
+    ["dreams", "꿈/비전", "장기 방향"],
+    ["database", "데이터", "일정 기록/사전"]
+  ];
+}
+
+function renderPrint() {
+  const selected = new Set(state.printItems);
+  const ordered = state.printItems.map((id) => printOptions().find(([value]) => value === id)).filter(Boolean);
+  const rest = printOptions().filter(([id]) => !selected.has(id));
+  return `<div class="printGrid">
+    <section class="card">
+      <div class="cardHead"><h3>출력 순서</h3><button data-action="printSelected">출력</button></div>
+      <div class="printOrder">
+        ${ordered.map(([id, label, desc], index) => `<article>
+          <b>${label}</b><span>${desc}</span>
+          <button data-print-move="${id}" data-dir="-1" ${index === 0 ? "disabled" : ""}>위</button>
+          <button data-print-move="${id}" data-dir="1" ${index === ordered.length - 1 ? "disabled" : ""}>아래</button>
+          <button class="dangerText" data-print-toggle="${id}">제외</button>
+        </article>`).join("") || empty("출력할 항목을 선택하세요.")}
+      </div>
+    </section>
+    <section class="card">
+      <div class="cardHead"><h3>추가 가능한 화면</h3><span>${rest.length}개</span></div>
+      <div class="printAddList">
+        ${rest.map(([id, label, desc]) => `<button data-print-toggle="${id}"><b>${label}</b><span>${desc}</span></button>`).join("") || empty("모든 화면이 선택되었습니다.")}
+      </div>
+    </section>
+    <section class="card wide">
+      <div class="cardHead"><h3>빠른 프리셋</h3><span>필요하면 순서를 다시 조정하세요</span></div>
+      <div class="inlineActions">
+        <button class="soft" data-print-preset="week">주간 출력 구성</button>
+        <button class="soft" data-print-preset="month">월간 출력 구성</button>
+        <button class="soft" data-print-preset="all">전체 출력 구성</button>
+      </div>
+    </section>
+  </div>`;
+}
+
 function renderSettings() {
   const sync = state.syncStatus;
   const syncLabel = sync
@@ -1193,9 +1252,9 @@ function renderAI() {
   </div>`;
 }
 
-function openPrintDocument(mode) {
-  const sections = printSections(mode);
-  const label = mode === "week" ? "주간 출력" : mode === "month" ? "월간 출력" : "전체 출력";
+function openPrintDocument(items = state.printItems) {
+  const sections = printSections(items);
+  const label = "Planner 출력";
   const win = window.open("", "_blank", "width=1400,height=900");
   if (!win) {
     showToast("팝업 차단을 해제해야 출력창을 열 수 있습니다.");
@@ -1217,27 +1276,24 @@ function openPrintDocument(mode) {
   win.document.close();
 }
 
-function printSections(mode) {
-  const week = [
-    { title: "주간 계획표", html: renderPlanner() },
-    { title: "주간 대시보드", html: renderDashboard() },
-    { title: "일간 계획표", html: renderDaily() }
-  ];
-  if (mode === "week") return week;
-  const month = [...week, { title: "월간 계획표", html: renderMonthly() }];
-  if (mode === "month") return month;
-  return [
-    { title: "오늘", html: renderToday() },
-    ...month,
-    { title: "To Do List", html: renderTasks() },
-    { title: "습관", html: renderHabits() },
-    { title: "목표", html: renderGoals() },
-    { title: "프로젝트", html: renderProjects() },
-    { title: "메모", html: renderNotes() },
-    { title: "회고", html: renderReview() },
-    { title: "꿈 / 비전", html: renderDreams() },
-    { title: "데이터베이스", html: renderDatabase() }
-  ];
+function printSections(items = state.printItems) {
+  const titles = Object.fromEntries(printOptions().map(([id, label]) => [id, label]));
+  const renderers = {
+    today: renderToday,
+    planner: renderPlanner,
+    dashboard: renderDashboard,
+    daily: renderDaily,
+    monthly: renderMonthly,
+    tasks: renderTasks,
+    habits: renderHabits,
+    goals: renderGoals,
+    projects: renderProjects,
+    notes: renderNotes,
+    review: renderReview,
+    dreams: renderDreams,
+    database: renderDatabase
+  };
+  return items.filter((id) => renderers[id]).map((id) => ({ title: titles[id] || id, html: renderers[id]() }));
 }
 
 function eventRow(event) {
@@ -2014,14 +2070,38 @@ document.addEventListener("click", async (event) => {
     await refresh("카테고리를 삭제했습니다.");
     return;
   }
-  if (target.dataset.action === "openPrint") {
-    state.modal = "print";
-    state.modalData = null;
+  if (target.dataset.action === "printSelected") {
+    openPrintDocument(state.printItems);
+    return;
+  }
+  if (target.dataset.printPreset) {
+    state.printItems = target.dataset.printPreset === "week"
+      ? ["planner", "dashboard", "daily"]
+      : target.dataset.printPreset === "month"
+        ? ["planner", "dashboard", "daily", "monthly"]
+        : printOptions().map(([id]) => id);
     render();
     return;
   }
-  if (target.dataset.printMode) {
-    openPrintDocument(target.dataset.printMode);
+  if (target.dataset.printToggle) {
+    const id = target.dataset.printToggle;
+    state.printItems = state.printItems.includes(id)
+      ? state.printItems.filter((item) => item !== id)
+      : [...state.printItems, id];
+    render();
+    return;
+  }
+  if (target.dataset.printMove) {
+    const id = target.dataset.printMove;
+    const dir = Number(target.dataset.dir || 0);
+    const index = state.printItems.indexOf(id);
+    const nextIndex = index + dir;
+    if (index >= 0 && nextIndex >= 0 && nextIndex < state.printItems.length) {
+      const next = [...state.printItems];
+      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+      state.printItems = next;
+      render();
+    }
     return;
   }
   if (target.dataset.action === "prevWeek") state.weekStart = addDays(state.weekStart, -7);

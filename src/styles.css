@@ -145,18 +145,24 @@ nav {
   padding: 0 14px;
 }
 .topbar {
+  position: relative;
   border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
   background: color-mix(in srgb, var(--card) 84%, transparent);
   backdrop-filter: blur(18px);
 }
 .topbar h2 { margin: 1px 0 0; font-size: 19px; letter-spacing: -.04em; }
 .topSearch {
-  flex: 1;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: min(620px, 48vw);
   display: flex;
   justify-content: center;
   min-width: 220px;
+  transform: translate(-50%, -50%);
 }
 .topActions, .actionPanel { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-start; }
+.topActions { margin-left: auto; }
 .globalSearch {
   width: min(620px, 100%);
   min-height: 38px;
@@ -174,10 +180,10 @@ nav {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 13%, transparent);
 }
 .searchOverlay {
-  position: fixed;
-  top: 82px;
-  left: calc(188px + 12px + (100vw - 188px - 36px) / 2);
-  width: min(760px, calc(100vw - 460px));
+  position: absolute;
+  top: 58px;
+  left: 50%;
+  width: min(760px, calc(100% - 40px));
   max-height: min(72vh, 680px);
   z-index: 38;
   display: grid;
@@ -225,6 +231,40 @@ nav {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.printGrid {
+  display: grid;
+  grid-template-columns: 1.1fr .9fr;
+  gap: 14px;
+}
+.printOrder,
+.printAddList {
+  display: grid;
+  gap: 10px;
+}
+.printOrder article,
+.printAddList button {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 54px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: var(--soft);
+  text-align: left;
+}
+.printAddList button {
+  grid-template-columns: 1fr;
+}
+.printOrder b,
+.printAddList b { font-size: 14px; }
+.printOrder span,
+.printAddList span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
 }
 .searchResult em {
   color: var(--muted);
@@ -1439,7 +1479,11 @@ td button {
   }
   .topbar h2 { font-size: 19px; }
   .topActions { gap: 6px; }
-  .topSearch { width: 100%; }
+  .topSearch {
+    position: static;
+    width: 100%;
+    transform: none;
+  }
   .globalSearch { width: min(100%, 620px); }
   .searchOverlay {
     left: 50%;
@@ -1461,6 +1505,7 @@ td button {
     overflow: auto;
   }
   .todayGrid, .dashboardGrid, .reviewGrid, .goalBoard, .projectGrid, .dreamBoard, .settingsGrid, .notesGrid, .aiGrid { grid-template-columns: 1fr; }
+  .printGrid { grid-template-columns: 1fr; }
   .aiChoiceGrid { grid-template-columns: 1fr; }
   .kanban { grid-template-columns: repeat(2, minmax(220px, 1fr)); }
   .dataGrid, .dataGrid.single { grid-template-columns: 1fr; }
