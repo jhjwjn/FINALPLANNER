@@ -406,6 +406,14 @@ function category(id) {
 function color(index = 0) {
   return themes[state.theme].colors[index % themes[state.theme].colors.length];
 }
+function autoColorIndex(categoryId, date, startTime, ignoreId = "") {
+  const base = Math.max(0, memory.categories.findIndex((c) => c.id === categoryId));
+  const sameDaySameCategory = memory.events
+    .filter((event) => event.id !== ignoreId && event.date === date && event.categoryId === categoryId)
+    .sort((a, b) => a.startTime.localeCompare(b.startTime));
+  const beforeCount = sameDaySameCategory.filter((event) => event.startTime <= startTime).length;
+  return (base + beforeCount) % themes[state.theme].colors.length;
+}
 function weekDates() {
   return Array.from({ length: 7 }, (_, i) => addDays(state.weekStart, i));
 }
@@ -523,7 +531,8 @@ function appShell() {
           <p class="eyebrow">${theme.label}</p>
           <h2>${viewTitle()}</h2>
         </div>
-        <div class="topActions"><input class="globalSearch" value="${escapeAttr(state.query)}" placeholder="검색">${renderTopActions()}</div>
+        <div class="topSearch"><input class="globalSearch" value="${escapeAttr(state.query)}" placeholder="일정, 목표, 할 일, 메모 검색"></div>
+        <div class="topActions">${renderTopActions()}</div>
       </header>
       ${actions ? `<section class="actionPanel">${actions}</section>` : ""}
       <section class="content">${renderView()}</section>
@@ -599,8 +608,8 @@ function viewTitle() {
 function renderTopActions() {
   const weekNav = `<button class="ghost" data-action="prevWeek">이전주</button><button class="ghost" data-action="thisWeek">이번주</button><button class="ghost" data-action="nextWeek">다음주</button>`;
   if (state.view === "today") return `<button class="primary" data-modal="quickAdd">빠른 추가</button><button class="soft" data-modal="note">빠른 메모</button>`;
-  if (["planner", "dashboard", "daily"].includes(state.view)) return `${weekNav}<button class="primary" data-modal="event">일정 추가</button><button class="soft" data-modal="note">메모</button>`;
-  if (state.view === "monthly") return `<button class="ghost" data-action="prevMonth">이전달</button><button class="ghost" data-action="thisMonth">이번달</button><button class="ghost" data-action="nextMonth">다음달</button><button class="primary" data-modal="event">일정 추가</button><button class="soft" data-modal="note">메모</button>`;
+  if (["planner", "dashboard", "daily"].includes(state.view)) return `${weekNav}<button class="primary" data-modal="event">일정 추가</button><button class="soft" data-action="openPrint">출력</button>`;
+  if (state.view === "monthly") return `<button class="ghost" data-action="prevMonth">이전달</button><button class="ghost" data-action="thisMonth">이번달</button><button class="ghost" data-action="nextMonth">다음달</button><button class="primary" data-modal="event">일정 추가</button><button class="soft" data-action="openPrint">출력</button>`;
   if (state.view === "tasks") return `<button class="primary" data-modal="task">할 일 추가</button>`;
   if (state.view === "habits") return `<button class="primary" data-modal="habit">습관 추가</button>`;
   if (state.view === "goals") return `<button class="primary" data-modal="goal">목표 추가</button>`;
@@ -618,10 +627,6 @@ function renderSearchOverlay() {
   const results = searchResults();
   if (!state.searchOpen && !state.query.trim()) return "";
   return `<section class="searchOverlay">
-    <div class="searchBox">
-      <label><span>통합 검색</span><input class="globalSearch searchLarge" value="${escapeAttr(state.query)}" placeholder="일정, 목표, 할 일, 메모, 프로젝트 검색"></label>
-      <button class="ghost" data-action="closeSearch">닫기</button>
-    </div>
     <div class="searchResults">
       ${results.length ? results.map(searchResultRow).join("") : empty(state.query.trim() ? "검색 결과가 없습니다." : "검색어를 입력하세요.")}
     </div>
@@ -657,11 +662,17 @@ function searchResults() {
 
 function searchResultRow(result) {
   const title = result.item.name || result.item.title || "이름 없음";
+  const colorIndex = viewColorIndex(result.view);
   return `<button class="searchResult" data-search-view="${result.view}" data-search-id="${result.item.id || ""}">
-    <span>${result.type}</span>
+    <span style="--search-color:${color(colorIndex)}">${result.type}</span>
     <b>${escapeHtml(title)}</b>
     <em>${escapeHtml(result.meta || "")}</em>
   </button>`;
+}
+
+function viewColorIndex(view) {
+  const order = ["today", "planner", "monthly", "dashboard", "daily", "tasks", "habits", "goals", "projects", "notes", "review", "dreams", "database", "settings", "ai"];
+  return Math.max(0, order.indexOf(view)) % themes[state.theme].colors.length;
 }
 
 function renderActions() {
@@ -912,18 +923,27 @@ function renderDashboard() {
 function renderWeeklyTimeline(events) {
   const dates = weekDates();
   const days = ["월", "화", "수", "목", "금", "토", "일"];
-  const hourLabels = Array.from({ length: 24 }, (_, hour) => `<div class="timelineHour" style="grid-column: span 2">${pad(hour)}:00</div>`).join("");
-  return `<div class="weekTimeline" style="grid-template-columns: 72px repeat(48, minmax(18px, 1fr))">
+  const startMinute = 7 * 60;
+  const endMinute = 25 * 60 + 30;
+  const slots = Math.ceil((endMinute - startMinute) / 30);
+  const hours = Array.from({ length: Math.ceil(slots / 2) }, (_, index) => (7 + index) % 24);
+  const hourLabels = hours.map((hour) => `<div class="timelineHour" style="grid-column: span 2">${pad(hour)}:00</div>`).join("");
+  return `<div class="weekTimeline" style="grid-template-columns: 48px repeat(${slots}, minmax(20px, 1fr)); --slots:${slots}">
     <div class="timelineCorner"></div>${hourLabels}
     ${dates.map((date, index) => {
       const dayEventsValue = events.filter((event) => event.date === date);
       return `<div class="timelineDayLabel">${days[index]}<span>${fmtMD(date)}</span></div>
-        <div class="timelineRow" style="grid-column: span 48">
-          ${Array.from({ length: 48 }, (_, i) => `<i class="${i % 2 === 0 ? "hour" : "half"}"></i>`).join("")}
+        <div class="timelineRow" style="grid-column: span ${slots}; --slots:${slots}">
+          ${Array.from({ length: slots }, (_, i) => `<i class="${i % 2 === 0 ? "hour" : "half"}"></i>`).join("")}
           ${dayEventsValue.map((event) => {
-            const start = Math.max(0, Math.floor(minutes(event.startTime) / 30));
-            const span = Math.max(1, Math.ceil(duration(event.startTime, event.endTime) / 30));
-            return `<button class="timelineEvent" style="--event:${color(event.colorIndex)}; grid-column:${start + 1} / span ${span}" data-event="${event.id}">
+            const rawStart = minutes(event.startTime);
+            const rawEnd = minutes(event.endTime) <= rawStart ? minutes(event.endTime) + 1440 : minutes(event.endTime);
+            const clippedStart = clamp(rawStart < startMinute ? rawStart + 1440 : rawStart, startMinute, endMinute);
+            const clippedEnd = clamp(rawEnd < startMinute ? rawEnd + 1440 : rawEnd, startMinute, endMinute);
+            if (clippedEnd <= startMinute || clippedStart >= endMinute) return "";
+            const left = ((clippedStart - startMinute) / (endMinute - startMinute)) * 100;
+            const width = Math.max(2.4, ((clippedEnd - clippedStart) / (endMinute - startMinute)) * 100);
+            return `<button class="timelineEvent" style="--event:${color(event.colorIndex)}; left:${left}%; width:${width}%" data-event="${event.id}">
               <b>${escapeHtml(event.name)}</b><span>${event.startTime}-${event.endTime}</span>
             </button>`;
           }).join("")}
@@ -1130,6 +1150,18 @@ function renderSettings() {
       </div>
       <div class="inlineActions"><button class="soft" data-action="restartTutorial">튜토리얼 다시 보기</button></div>
     </section>
+    <section class="card wide">
+      <div class="cardHead"><h3>카테고리 관리</h3><button data-modal="category">추가</button></div>
+      <div class="categoryManage">
+        ${uniqueCategories().map((cat, index) => `<article>
+          <i style="background:${color(index)}"></i>
+          <b>${escapeHtml(cat.name)}</b>
+          <span>${memory.events.filter((event) => event.categoryId === cat.id).length}개 일정</span>
+          <button data-edit-category="${cat.id}">수정</button>
+          <button class="dangerText" data-delete-category="${cat.id}">삭제</button>
+        </article>`).join("")}
+      </div>
+    </section>
   </div>`;
 }
 
@@ -1159,6 +1191,53 @@ function renderAI() {
       <textarea id="aiPrompt">${buildPrompt(state.aiPromptType)}</textarea>
     </section>
   </div>`;
+}
+
+function openPrintDocument(mode) {
+  const sections = printSections(mode);
+  const label = mode === "week" ? "주간 출력" : mode === "month" ? "월간 출력" : "전체 출력";
+  const win = window.open("", "_blank", "width=1400,height=900");
+  if (!win) {
+    showToast("팝업 차단을 해제해야 출력창을 열 수 있습니다.");
+    return;
+  }
+  win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${label}</title><link rel="stylesheet" href="src/styles.css"><style>
+    body{background:#fff;padding:24px;color:#111;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    .printDoc{display:grid;gap:22px}
+    .printPage{break-after:page;padding:8px}
+    .printPage h1{margin:0 0 14px;font-size:22px}
+    .content{height:auto;overflow:visible;padding:0}
+    .sidebar,.topbar,.actionPanel,.modalBackdrop,.searchOverlay,.toast,input,textarea,select,.cardHead button,.miniActions,.goalStepper{display:none!important}
+    button{display:block!important}
+    .main{display:block!important;border:0!important;box-shadow:none!important;background:#fff!important}
+    .plannerGrid,.monthlyGrid,.dailyBoard,.weekTimeline{min-width:0!important;width:100%!important;overflow:hidden!important}
+    .card,.heroCard,.metric,.lane,.goalCard,.projectCard,.dreamCard{box-shadow:none!important;break-inside:avoid}
+    @page{size:A4 landscape;margin:10mm}
+  </style></head><body><main class="printDoc">${sections.map((section) => `<section class="printPage"><h1>${section.title}</h1>${section.html}</section>`).join("")}</main><script>setTimeout(()=>window.print(),350)</script></body></html>`);
+  win.document.close();
+}
+
+function printSections(mode) {
+  const week = [
+    { title: "주간 계획표", html: renderPlanner() },
+    { title: "주간 대시보드", html: renderDashboard() },
+    { title: "일간 계획표", html: renderDaily() }
+  ];
+  if (mode === "week") return week;
+  const month = [...week, { title: "월간 계획표", html: renderMonthly() }];
+  if (mode === "month") return month;
+  return [
+    { title: "오늘", html: renderToday() },
+    ...month,
+    { title: "To Do List", html: renderTasks() },
+    { title: "습관", html: renderHabits() },
+    { title: "목표", html: renderGoals() },
+    { title: "프로젝트", html: renderProjects() },
+    { title: "메모", html: renderNotes() },
+    { title: "회고", html: renderReview() },
+    { title: "꿈 / 비전", html: renderDreams() },
+    { title: "데이터베이스", html: renderDatabase() }
+  ];
 }
 
 function eventRow(event) {
@@ -1221,12 +1300,14 @@ function renderModal() {
     review: "회고 작성",
     dream: "비전 입력",
     template: "일정사전",
-    category: "카테고리"
+    category: "카테고리",
+    print: "출력 모드"
   };
+  const noSubmit = state.modal === "print";
   return `<div class="modalBackdrop" data-close="1"><form class="modal" data-form="${state.modal}">
     <header><h3>${titles[state.modal]}</h3><button type="button" data-close="1">닫기</button></header>
     ${modalBody(state.modal)}
-    <footer><button class="primary" type="submit">저장</button></footer>
+    ${noSubmit ? "" : `<footer><button class="primary" type="submit">저장</button></footer>`}
   </form></div>`;
 }
 function categoryOptions(selected = "") {
@@ -1239,10 +1320,15 @@ function templateDatalist() {
   return `<datalist id="templateSuggestions">${memory.templates.map((template) => `<option value="${escapeAttr(template.name)}">${escapeHtml(category(template.categoryId).name)}</option>`).join("")}</datalist>`;
 }
 function modalBody(type) {
+  if (type === "print") return `<div class="printChoices">
+    <button type="button" data-print-mode="week"><b>주간 출력</b><span>주간계획, 주간대시보드, 일간계획 중심</span></button>
+    <button type="button" data-print-mode="month"><b>월간 출력</b><span>월간계획까지 포함한 계획 출력</span></button>
+    <button type="button" data-print-mode="all"><b>전체 출력</b><span>현재 앱의 모든 주요 화면을 인쇄/PDF 저장</span></button>
+  </div><p class="tiny">브라우저 인쇄창에서 대상 항목을 PDF로 저장으로 선택하면 파일로 저장할 수 있습니다.</p>`;
   if (type === "quickAdd") return `<label>내용<input name="name" placeholder="일정 또는 할 일"></label><div class="two"><label>날짜<input type="date" name="date" value="${today()}"></label><label>종류<select name="kind"><option value="event">일정</option><option value="task">할 일</option></select></label></div>`;
   if (type === "event") {
     const eventValue = state.modalData || {};
-    return `<label>일정명<input name="name" list="templateSuggestions" autocomplete="off" required placeholder="예: 전자기학 공부" value="${escapeAttr(eventValue.name || "")}"></label>${templateDatalist()}<div class="two"><label>날짜<input type="date" name="date" value="${eventValue.date || state.selectedDate}"></label><label>카테고리<select name="categoryId">${categoryOptions(eventValue.categoryId)}</select></label></div><div class="two"><label>시작<input type="time" name="startTime" value="${eventValue.startTime || "09:00"}" step="1800"></label><label>종료<input type="time" name="endTime" value="${eventValue.endTime || "10:00"}" step="1800"></label></div><label>연결 목표<select name="goalId">${goalOptions(eventValue.goalId || "")}</select></label><label>메모<textarea name="memo">${escapeHtml(eventValue.memo || "")}</textarea></label>${eventValue.id ? `${eventValue.repeatRuleId ? `<button class="dangerInline" type="button" data-skip-repeat-event="${eventValue.id}">이번 회차만 제외</button>` : ""}<button class="dangerInline" type="button" data-delete-event="${eventValue.id}">일정 삭제</button>` : ""}`;
+    return `<label>일정명<input name="name" list="templateSuggestions" autocomplete="off" required placeholder="예: 전자기학 공부" value="${escapeAttr(eventValue.name || "")}"></label>${templateDatalist()}<div class="two"><label>날짜<input type="date" name="date" value="${eventValue.date || state.selectedDate}"></label><label>카테고리<select name="categoryId">${categoryOptions(eventValue.categoryId)}</select></label></div><div class="two"><label>시작<input type="time" name="startTime" value="${eventValue.startTime || "09:00"}" step="1800"></label><label>종료<input type="time" name="endTime" value="${eventValue.endTime || "10:00"}" step="1800"></label></div><p class="tiny">색상은 카테고리 기준으로 자동 배정되고, 같은 카테고리 일정이 연속될 때는 구분되도록 살짝 섞입니다.</p><label>연결 목표<select name="goalId">${goalOptions(eventValue.goalId || "")}</select></label><label>메모<textarea name="memo">${escapeHtml(eventValue.memo || "")}</textarea></label>${eventValue.id ? `${eventValue.repeatRuleId ? `<button class="dangerInline" type="button" data-skip-repeat-event="${eventValue.id}">이번 회차만 제외</button>` : ""}<button class="dangerInline" type="button" data-delete-event="${eventValue.id}">일정 삭제</button>` : ""}`;
   }
   if (type === "repeat") {
     const repeat = state.modalData || {};
@@ -1271,7 +1357,10 @@ function modalBody(type) {
   if (type === "review") return `<div class="two"><label>날짜<input type="date" name="date" value="${today()}"></label><label>점수<input type="number" name="score" value="${todayScore()}"></label></div><label>잘한 것<textarea name="win" placeholder="오늘 유지한 것"></textarea></label><label>배운 것<textarea name="lesson" placeholder="다음에 바꿀 것"></textarea></label>`;
   if (type === "dream") return `<label>제목<input name="title" required></label><div class="two"><label>영역<select name="area"><option>career</option><option>life</option><option>health</option><option>relationship</option></select></label><label>기간<select name="horizon"><option>year</option><option>life</option><option>quarter</option></select></label></div><label>설명<textarea name="body"></textarea></label>`;
   if (type === "template") return `<label>일정명<input name="name" required></label><div class="two"><label>카테고리<select name="categoryId">${categoryOptions()}</select></label><label>색상<input type="number" name="colorIndex" value="0" min="0" max="4"></label></div><label>기본 메모<textarea name="defaultMemo"></textarea></label>`;
-  if (type === "category") return `<label>카테고리명<input name="name" required></label>`;
+  if (type === "category") {
+    const cat = state.modalData || {};
+    return `<label>카테고리명<input name="name" required value="${escapeAttr(cat.name || "")}"></label>`;
+  }
   return "";
 }
 
@@ -1325,7 +1414,8 @@ async function handleSubmit(event) {
   if (state.modal === "quickAdd") {
     if (data.kind === "task") await put("tasks", taskSeed(data.name, data.date, "medium", memory.categories[0].id));
     else {
-      const quickEvent = eventSeed(data.name, data.date, "09:00", "10:00", memory.categories[0].id, 0, "");
+      const defaultCategory = memory.categories[0]?.id || "";
+      const quickEvent = eventSeed(data.name, data.date, "09:00", "10:00", defaultCategory, autoColorIndex(defaultCategory, data.date, "09:00"), "");
       const conflict = findEventConflict(quickEvent);
       if (conflict) {
         showToast(`겹치는 일정이 있습니다: ${conflict.name}`);
@@ -1344,7 +1434,7 @@ async function handleSubmit(event) {
       endTime: data.endTime,
       categoryId: data.categoryId,
       goalId: data.goalId || "",
-      colorIndex: memory.categories.findIndex((c) => c.id === data.categoryId),
+      colorIndex: autoColorIndex(data.categoryId, data.date, data.startTime, old?.id || ""),
       memo: data.memo,
       status: old?.status || "planned",
       repeatRuleId: old?.repeatRuleId || "",
@@ -1371,7 +1461,7 @@ async function handleSubmit(event) {
       endDate: data.endDate || addDays(state.weekStart, 55),
       intervalWeeks: Number(data.intervalWeeks || old?.intervalWeeks || 1),
       categoryId: data.categoryId,
-      colorIndex: memory.categories.findIndex((c) => c.id === data.categoryId),
+      colorIndex: autoColorIndex(data.categoryId, data.startDate || state.weekStart, data.startTime, old?.id || ""),
       isActive: old?.isActive ?? true,
       createdAt: old?.createdAt || now,
       updatedAt: now
@@ -1411,13 +1501,14 @@ async function handleSubmit(event) {
   if (state.modal === "dream") await put("dreams", { id: uid("drm"), title: data.title, area: data.area, horizon: data.horizon, body: data.body, createdAt: now, updatedAt: now });
   if (state.modal === "template") await put("schedule_templates", { id: uid("tpl"), name: data.name, categoryId: data.categoryId, colorIndex: Number(data.colorIndex), defaultMemo: data.defaultMemo, useCount: 0, isFavorite: false, isActive: true, createdAt: now, updatedAt: now });
   if (state.modal === "category") {
+    const old = state.modalData?.id ? await get("categories", state.modalData.id) : null;
     const categoryName = String(data.name || "").trim();
-    const duplicate = memory.categories.find((cat) => cat.name.trim().toLowerCase() === categoryName.toLowerCase());
+    const duplicate = memory.categories.find((cat) => cat.id !== old?.id && cat.name.trim().toLowerCase() === categoryName.toLowerCase());
     if (duplicate) {
       showToast("이미 있는 카테고리입니다.");
       return;
     }
-    await put("categories", { id: uid("cat"), name: categoryName, sortOrder: memory.categories.length, isActive: true, createdAt: now, updatedAt: now });
+    await put("categories", { id: old?.id || uid("cat"), name: categoryName, sortOrder: old?.sortOrder ?? memory.categories.length, isActive: true, createdAt: old?.createdAt || now, updatedAt: now });
   }
   state.modal = null;
   state.modalData = null;
@@ -1906,6 +1997,33 @@ document.addEventListener("click", async (event) => {
     await refresh("테마를 변경했습니다.");
     return;
   }
+  if (target.dataset.editCategory) {
+    const cat = await get("categories", target.dataset.editCategory);
+    if (cat) {
+      state.modal = "category";
+      state.modalData = cat;
+      render();
+    }
+    return;
+  }
+  if (target.dataset.deleteCategory) {
+    const cat = await get("categories", target.dataset.deleteCategory);
+    if (!cat || !askDelete("카테고리")) return;
+    await put("categories", { ...cat, isActive: false, updatedAt: new Date().toISOString() });
+    if (state.selectedCategory === cat.id) state.selectedCategory = "all";
+    await refresh("카테고리를 삭제했습니다.");
+    return;
+  }
+  if (target.dataset.action === "openPrint") {
+    state.modal = "print";
+    state.modalData = null;
+    render();
+    return;
+  }
+  if (target.dataset.printMode) {
+    openPrintDocument(target.dataset.printMode);
+    return;
+  }
   if (target.dataset.action === "prevWeek") state.weekStart = addDays(state.weekStart, -7);
   if (target.dataset.action === "thisWeek") state.weekStart = weekStart(today());
   if (target.dataset.action === "nextWeek") state.weekStart = addDays(state.weekStart, 7);
@@ -1986,9 +2104,10 @@ document.addEventListener("input", (event) => {
   if (event.target.matches(".globalSearch")) {
     if (state.isComposing || event.isComposing) return;
     state.query = event.target.value;
-    state.searchOpen = true;
+    state.searchOpen = !!state.query.trim();
     syncSearchInputs();
-    renderSearchResultsOnly();
+    if (state.searchOpen) renderSearchResultsOnly();
+    else render();
     return;
   }
   if (state.modal === "event" && event.target.matches('.modal input[name="name"]')) {
@@ -2015,15 +2134,23 @@ document.addEventListener("compositionend", (event) => {
   if (!event.target.matches(".globalSearch")) return;
   state.isComposing = false;
   state.query = event.target.value;
-  state.searchOpen = true;
+  state.searchOpen = !!state.query.trim();
   syncSearchInputs();
-  renderSearchResultsOnly();
+  if (state.searchOpen) renderSearchResultsOnly();
+  else render();
 });
 
 document.addEventListener("focusin", (event) => {
   if (!event.target.matches(".globalSearch")) return;
   state.searchOpen = true;
   if (!$(".searchOverlay")) render(true);
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || !state.searchOpen) return;
+  state.searchOpen = false;
+  state.query = "";
+  render();
 });
 
 document.addEventListener("change", (event) => {
