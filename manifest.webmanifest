@@ -1,0 +1,19 @@
+{
+  "name": "Life Planner",
+  "short_name": "Planner",
+  "description": "Personal calendar, goals, notes, and mobile schedule check.",
+  "start_url": "/mobile.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f5f1ea",
+  "theme_color": "#5f6f52",
+  "icons": [
+    {
+      "src": "/assets/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
