@@ -159,7 +159,7 @@ function showToast(message) {
   setTimeout(() => {
     state.toast = "";
     render();
-  }, 2600);
+  }, 3000);
 }
 
 function loginView() {
@@ -414,7 +414,7 @@ async function refresh(message = "") {
   if (message) setTimeout(() => {
     state.toast = "";
     render();
-  }, 2400);
+  }, 3000);
 }
 
 function render() {

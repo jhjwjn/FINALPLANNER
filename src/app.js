@@ -237,17 +237,7 @@ async function seed() {
   if (!settings) {
     await put("settings", { id: "app", theme: "paper", weekStart: "월", focusMode: false, updatedAt: new Date().toISOString() });
   }
-  if ((await all("categories")).length === 0) {
-    const now = new Date().toISOString();
-    await bulkPut("categories", ["공부", "운동", "독서", "프로젝트", "생활", "휴식"].map((name, index) => ({
-      id: uid("cat"),
-      name,
-      sortOrder: index,
-      isActive: true,
-      createdAt: now,
-      updatedAt: now
-    })));
-  }
+  await ensureDefaultCategories();
   const categories = await all("categories");
   const cat = (name) => categories.find((c) => c.name === name)?.id || categories[0]?.id;
   const baseToday = today();
@@ -311,6 +301,72 @@ async function seed() {
       dreamSeed("1년 뒤의 나", "꾸준한 루틴과 결과물이 쌓인 사람", "career"),
       dreamSeed("건강한 생활", "수면, 운동, 식사를 무너지지 않게 유지", "life")
     ]);
+  }
+}
+
+async function ensureDefaultCategories() {
+  const existing = await all("categories");
+  const activeNames = new Set(existing.filter((cat) => cat.isActive !== false).map((cat) => String(cat.name || "").trim()));
+  const now = new Date().toISOString();
+  const missing = ["공부", "운동", "독서", "프로젝트", "생활", "휴식"]
+    .filter((name) => !activeNames.has(name))
+    .map((name, index) => ({
+      id: uid("cat"),
+      name,
+      sortOrder: existing.length + index,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now
+    }));
+  if (missing.length) await bulkPut("categories", missing);
+}
+
+async function cleanupDuplicateSeedData() {
+  await cleanupDuplicateCategories();
+  await cleanupDuplicateRecords("schedule_templates", (item) => String(item.name || "").trim().toLowerCase());
+  await cleanupDuplicateRecords("schedule_events", (item) => [item.name, item.date, item.startTime, item.endTime].map((x) => String(x || "").trim().toLowerCase()).join("|"));
+  await cleanupDuplicateRecords("goals", (item) => [item.name, item.period, item.startDate, item.endDate].map((x) => String(x || "").trim().toLowerCase()).join("|"));
+  await cleanupDuplicateRecords("tasks", (item) => [item.name, item.dueDate, item.projectId || ""].map((x) => String(x || "").trim().toLowerCase()).join("|"));
+  await cleanupDuplicateRecords("habits", (item) => String(item.name || "").trim().toLowerCase());
+}
+
+async function cleanupDuplicateCategories() {
+  const categories = await all("categories");
+  const seen = new Map();
+  for (const cat of categories) {
+    const key = String(cat.name || "").trim().toLowerCase();
+    if (!key) continue;
+    const previous = seen.get(key);
+    if (!previous) {
+      seen.set(key, cat);
+      continue;
+    }
+    const canonical = previous.id;
+    await rewriteCategoryReferences(cat.id, canonical);
+    await remove("categories", cat.id);
+  }
+}
+
+async function rewriteCategoryReferences(fromId, toId) {
+  for (const store of ["schedule_templates", "schedule_events", "repeat_rules", "goals", "tasks", "habits", "projects"]) {
+    const values = await all(store);
+    for (const item of values) {
+      if (item.categoryId === fromId) await put(store, { ...item, categoryId: toId, updatedAt: new Date().toISOString() });
+    }
+  }
+}
+
+async function cleanupDuplicateRecords(store, keyFn) {
+  const values = await all(store);
+  const seen = new Map();
+  for (const item of values) {
+    const key = keyFn(item);
+    if (!key || key === "|||") continue;
+    if (!seen.has(key)) {
+      seen.set(key, item.id);
+      continue;
+    }
+    await remove(store, item.id);
   }
 }
 
@@ -611,7 +667,7 @@ function renderActions() {
     ["categories", "분류"],
     ["repeats", "반복 일정"]
   ].map(([id, label]) => `<button class="pill ${state.dataTab === id ? "active" : ""}" data-data-tab="${id}">${label}</button>`).join("");
-  if (["today", "planner", "monthly", "dashboard", "daily", "tasks", "goals"].includes(state.view)) return cats.join("");
+  if (["planner", "monthly", "dashboard", "daily", "tasks", "goals"].includes(state.view)) return cats.join("");
   if (state.view === "habits") return `<span class="panelHint">습관 칸을 누르면 해당 날짜의 체크 상태가 바뀝니다.</span>`;
   if (state.view === "projects") return `<span class="panelHint">프로젝트는 다음 행동 완료율로 진행률을 계산합니다.</span>`;
   if (state.view === "notes") return `<span class="panelHint">계획 원칙, AI 질문, 장기 아이디어를 한 곳에 보관합니다.</span>`;
@@ -1217,7 +1273,15 @@ async function handleSubmit(event) {
   if (state.modal === "review") await put("reviews", { id: uid("rev"), date: data.date, score: Number(data.score), win: data.win, lesson: data.lesson, createdAt: now, updatedAt: now });
   if (state.modal === "dream") await put("dreams", { id: uid("drm"), title: data.title, area: data.area, horizon: data.horizon, body: data.body, createdAt: now, updatedAt: now });
   if (state.modal === "template") await put("schedule_templates", { id: uid("tpl"), name: data.name, categoryId: data.categoryId, colorIndex: Number(data.colorIndex), defaultMemo: data.defaultMemo, useCount: 0, isFavorite: false, isActive: true, createdAt: now, updatedAt: now });
-  if (state.modal === "category") await put("categories", { id: uid("cat"), name: data.name, sortOrder: memory.categories.length, isActive: true, createdAt: now, updatedAt: now });
+  if (state.modal === "category") {
+    const categoryName = String(data.name || "").trim();
+    const duplicate = memory.categories.find((cat) => cat.name.trim().toLowerCase() === categoryName.toLowerCase());
+    if (duplicate) {
+      showToast("이미 있는 카테고리입니다.");
+      return;
+    }
+    await put("categories", { id: uid("cat"), name: categoryName, sortOrder: memory.categories.length, isActive: true, createdAt: now, updatedAt: now });
+  }
   state.modal = null;
   state.modalData = null;
   await refresh("저장했습니다.");
@@ -1230,7 +1294,7 @@ async function refresh(toast = "") {
   }
   state.toast = toast;
   render();
-  if (toast) setTimeout(() => { state.toast = ""; render(); }, 1600);
+  if (toast) setTimeout(() => { state.toast = ""; render(); }, 3200);
 }
 
 function render(focusSearch = false) {
@@ -1388,7 +1452,13 @@ function askDelete(kind) {
 
 document.addEventListener("click", async (event) => {
   if (Date.now() < state.suppressClickUntil) return;
-  const target = event.target.closest("button, [data-close]");
+  if (event.target.dataset.close) {
+    state.modal = null;
+    state.modalData = null;
+    render();
+    return;
+  }
+  const target = event.target.closest("button");
   if (target?.dataset.action === "nextTutorial") {
     state.tutorialStep += 1;
     render();
@@ -1477,17 +1547,6 @@ document.addEventListener("click", async (event) => {
     state.modal = target.dataset.modal;
     state.modalData = null;
     render();
-    return;
-  }
-  if (target.dataset.close) {
-    state.modal = null;
-    state.modalData = null;
-    render();
-    return;
-  }
-  if (target.dataset.event) {
-    const eventValue = await get("schedule_events", target.dataset.event);
-    if (eventValue) openEventModal(eventValue);
     return;
   }
   if (target.dataset.deleteEvent) {
@@ -1607,6 +1666,12 @@ document.addEventListener("click", async (event) => {
     await refresh("상태를 변경했습니다.");
     return;
   }
+  if (target.dataset.event) {
+    if (state.modal === "event" && state.modalData?.id === target.dataset.event) return;
+    const eventValue = await get("schedule_events", target.dataset.event);
+    if (eventValue) openEventModal(eventValue);
+    return;
+  }
   if (target.dataset.taskDone) {
     const task = await get("tasks", target.dataset.taskDone);
     await put("tasks", { ...task, status: task.status === "done" ? "todo" : "done", updatedAt: new Date().toISOString() });
@@ -1691,6 +1756,7 @@ document.addEventListener("click", async (event) => {
     try {
       await pullAllFromSupabase();
       await seed();
+      await cleanupDuplicateSeedData();
       state.syncStatus = await dbHealthCheck();
       await refresh("Supabase에서 가져왔습니다.");
     } catch (error) {
@@ -1841,6 +1907,7 @@ document.addEventListener("mouseup", async () => {
   }
 
   if (drag.type === "select") {
+    if (drag.startMinute === drag.endMinute) return;
     const start = Math.min(drag.startMinute, drag.endMinute);
     const end = Math.max(drag.startMinute, drag.endMinute) + 30;
     const startTime = timeFromMinutes(start);
@@ -1870,6 +1937,7 @@ async function boot() {
     render();
   });
   await seed();
+  await cleanupDuplicateSeedData();
   if (state.authUser) await flushSyncQueue();
   await load();
   state.showTutorial = !memory.settings?.tutorialDone && !(isSupabaseConfigured() && isSupabaseReady() && navigator.onLine && !state.authUser);

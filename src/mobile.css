@@ -31,7 +31,9 @@ button {
   border: 0;
   color: inherit;
   cursor: pointer;
+  transition: transform .28s cubic-bezier(.2, .8, .2, 1), background .28s ease, border-color .28s ease, opacity .28s ease, box-shadow .28s ease;
 }
+button:active { transform: scale(.975); }
 button, input, select, textarea {
   touch-action: manipulation;
 }
@@ -515,11 +517,11 @@ html, body, * { scrollbar-width: none; }
   font-size: 11px;
 }
 .monthDay {
-  min-height: 72px;
+  min-height: 66px;
   display: grid;
   align-content: start;
-  gap: 7px;
-  padding: 8px 6px;
+  gap: 5px;
+  padding: 6px 5px;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: color-mix(in srgb, var(--card) 88%, transparent);
@@ -675,15 +677,18 @@ html, body, * { scrollbar-width: none; }
   position: fixed;
   left: 16px;
   right: 16px;
-  bottom: calc(86px + env(safe-area-inset-bottom));
+  top: calc(12px + env(safe-area-inset-top));
   z-index: 50;
   padding: 13px 15px;
   border-radius: 18px;
-  background: var(--text);
-  color: var(--card);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line));
+  background: color-mix(in srgb, var(--card) 80%, var(--accent) 16%);
+  color: var(--text);
   text-align: center;
   font-weight: 950;
   box-shadow: var(--shadow);
+  pointer-events: none;
+  animation: mToastIn 3s cubic-bezier(.2, .8, .2, 1) both;
 }
 .mEmpty {
   min-height: 70px;
@@ -698,6 +703,28 @@ html, body, * { scrollbar-width: none; }
 .muted, .bottomSheet .muted {
   color: var(--muted);
   font-weight: 800;
+}
+
+.mobileCard,
+.mobileHero,
+.quickNote,
+.mobileEventBlock,
+.mobileEventItem,
+.mBottom button,
+.bottomSheet {
+  transition: transform .3s cubic-bezier(.2, .8, .2, 1), border-color .3s ease, background .3s ease, box-shadow .3s ease, opacity .3s ease;
+}
+.mobileCard:active,
+.mobileEventItem:active,
+.mobileEventBlock:active {
+  transform: scale(.992);
+}
+
+@keyframes mToastIn {
+  0% { opacity: 0; transform: translateY(-14px) scale(.98); }
+  12% { opacity: 1; transform: translateY(0) scale(1); }
+  84% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-12px) scale(.985); }
 }
 @media (orientation: landscape) and (max-height: 560px) {
   .mobileShell {
