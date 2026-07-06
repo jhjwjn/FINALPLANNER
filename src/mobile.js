@@ -84,6 +84,42 @@ const themes = {
   }
 };
 
+const JA_TEXT = {
+  "메인": "メイン",
+  "일정": "予定",
+  "메모": "メモ",
+  "설정": "設定",
+  "오늘": "今日",
+  "빠른 메모": "クイックメモ",
+  "이전": "前",
+  "이번": "今",
+  "다음": "次",
+  "오늘 일정": "今日の予定",
+  "최근 메모": "最近のメモ",
+  "새 메모": "新規メモ",
+  "테마": "テーマ",
+  "모바일 전용": "モバイル専用",
+  "언어": "言語",
+  "한국어": "韓国語",
+  "일본어": "日本語",
+  "동기화": "同期",
+  "지금 동기화": "今すぐ同期",
+  "알림 권한 켜기": "通知を有効化",
+  "로그아웃": "ログアウト",
+  "일정 수정": "予定編集",
+  "일정 추가": "予定追加",
+  "닫기": "閉じる",
+  "일정명": "予定名",
+  "날짜": "日付",
+  "분류": "カテゴリ",
+  "시작": "開始",
+  "종료": "終了",
+  "내용": "内容",
+  "저장": "保存",
+  "완료": "完了",
+  "체크": "チェック"
+};
+
 const state = {
   user: null,
   ready: false,
@@ -96,10 +132,12 @@ const state = {
   editingEvent: null,
   toast: "",
   theme: localStorage.getItem("planner.mobile.theme") || "paper",
+  language: localStorage.getItem("planner.mobile.language") || "ko",
   offlineMode: false
 };
 
 const memory = {
+  settings: null,
   categories: [],
   events: [],
   notes: [],
@@ -110,7 +148,12 @@ function applyTheme() {
   const theme = themes[state.theme] || themes.paper;
   Object.entries(theme.vars).forEach(([key, value]) => document.documentElement.style.setProperty(`--${key}`, value));
   document.documentElement.dataset.theme = theme.dark ? "dark" : "light";
+  document.documentElement.lang = state.language === "ja" ? "ja" : "ko";
   document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme.vars.bg);
+}
+
+function t(value) {
+  return state.language === "ja" ? JA_TEXT[value] || value : value;
 }
 
 function color(index = 0) {
@@ -130,6 +173,8 @@ async function ensureCategories() {
 
 async function load() {
   await ensureCategories();
+  memory.settings = await get("settings", "app");
+  state.language = memory.settings?.language || localStorage.getItem("planner.mobile.language") || "ko";
   memory.categories = (await all("categories")).filter((cat) => cat.isActive !== false).sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
   memory.events = await all("schedule_events");
   memory.notes = await all("notes");
@@ -183,13 +228,13 @@ function appView() {
         <h1>${title()}</h1>
       </div>
     </header>
-    ${state.view === "calendar" ? `<nav class="viewTabs">${["day", "week", "month"].map((view) => `<button class="${state.calendarView === view ? "active" : ""}" data-calendar-view="${view}">${view.toUpperCase()}</button>`).join("")}</nav><section class="mNav"><button data-action="prev">이전</button><button data-action="today">이번</button><button data-action="next">다음</button></section>` : ""}
+    ${state.view === "calendar" ? `<nav class="viewTabs">${["day", "week", "month"].map((view) => `<button class="${state.calendarView === view ? "active" : ""}" data-calendar-view="${view}">${view.toUpperCase()}</button>`).join("")}</nav><section class="mNav"><button data-action="prev">${t("이전")}</button><button data-action="today">${t("이번")}</button><button data-action="next">${t("다음")}</button></section>` : ""}
     <section class="mContent">${content()}</section>
     <footer class="mBottom">
-      <button class="${state.view === "main" ? "active" : ""}" data-view="main">메인</button>
-      <button class="${state.view === "calendar" ? "active" : ""}" data-view="calendar">일정</button>
-      <button class="${state.view === "memo" ? "active" : ""}" data-view="memo">메모</button>
-      <button class="${state.view === "settings" ? "active" : ""}" data-view="settings">설정</button>
+      <button class="${state.view === "main" ? "active" : ""}" data-view="main">${t("메인")}</button>
+      <button class="${state.view === "calendar" ? "active" : ""}" data-view="calendar">${t("일정")}</button>
+      <button class="${state.view === "memo" ? "active" : ""}" data-view="memo">${t("메모")}</button>
+      <button class="${state.view === "settings" ? "active" : ""}" data-view="settings">${t("설정")}</button>
     </footer>
     ${state.view === "calendar" ? `<button class="fab" data-action="newEvent">+</button>` : ""}
     ${modal()}
@@ -198,9 +243,9 @@ function appView() {
 }
 
 function title() {
-  if (state.view === "main") return "오늘";
-  if (state.view === "memo") return "빠른 메모";
-  if (state.view === "settings") return "설정";
+  if (state.view === "main") return t("오늘");
+  if (state.view === "memo") return t("빠른 메모");
+  if (state.view === "settings") return t("설정");
   if (state.calendarView === "day") return fmtFull(state.date);
   if (state.calendarView === "week") return `${fmtMD(state.weekStart)} - ${fmtMD(addDays(state.weekStart, 6))}`;
   const d = dateFromISO(state.monthStart);
@@ -232,9 +277,9 @@ function mainView() {
       <article><b>${completed}</b><span>완료</span></article>
       <article><b>${activeGoals.length}</b><span>진행 목표</span></article>
     </section>
-    <section class="mobileCard"><div class="cardHead"><h3>오늘 일정</h3><button data-view="calendar">전체</button></div>${events.slice(0, 5).map(eventCard).join("") || empty("오늘 일정이 없습니다.")}</section>
+    <section class="mobileCard"><div class="cardHead"><h3>${t("오늘 일정")}</h3><button data-view="calendar">전체</button></div>${events.slice(0, 5).map(eventCard).join("") || empty("오늘 일정이 없습니다.")}</section>
     <section class="mobileCard"><div class="cardHead"><h3>목표</h3><span>확인용</span></div>${activeGoals.map(goalMini).join("") || empty("진행 중인 목표가 없습니다.")}</section>
-    <section class="mobileCard"><div class="cardHead"><h3>최근 메모</h3><button data-view="memo">작성</button></div>${latestNotes.map(noteMini).join("") || empty("최근 메모가 없습니다.")}</section>
+    <section class="mobileCard"><div class="cardHead"><h3>${t("최근 메모")}</h3><button data-view="memo">작성</button></div>${latestNotes.map(noteMini).join("") || empty("최근 메모가 없습니다.")}</section>
   </div>`;
 }
 
@@ -242,14 +287,15 @@ function memoView() {
   const latestNotes = [...memory.notes].sort((a, b) => String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")));
   return `<div class="mainStack memoStack">
     ${latestNotes.map(noteMini).join("") || empty("메모가 없습니다.")}
-    <button class="bottomAction primary" data-action="quickNote">새 메모</button>
+    <button class="bottomAction primary" data-action="quickNote">${t("새 메모")}</button>
   </div>`;
 }
 
 function mobileSettingsView() {
   return `<div class="mainStack">
-    <section class="mobileCard"><div class="cardHead"><h3>테마</h3><span>모바일 전용</span></div><div class="themeList">${Object.entries(themes).map(([key, theme]) => `<button class="${state.theme === key ? "active" : ""}" data-mobile-theme="${key}"><span>${theme.label}</span><i>${theme.colors.map((c) => `<b style="background:${c}"></b>`).join("")}</i></button>`).join("")}</div></section>
-    <section class="mobileCard"><div class="cardHead"><h3>동기화</h3><span>${state.user?.email || "offline"}</span></div><button class="soft" data-action="syncNow">지금 동기화</button><button class="soft" data-action="enableNotifications">알림 권한 켜기</button><button class="ghost" data-action="logout">로그아웃</button></section>
+    <section class="mobileCard"><div class="cardHead"><h3>${t("테마")}</h3><span>${t("모바일 전용")}</span></div><div class="themeList">${Object.entries(themes).map(([key, theme]) => `<button class="${state.theme === key ? "active" : ""}" data-mobile-theme="${key}"><span>${theme.label}</span><i>${theme.colors.map((c) => `<b style="background:${c}"></b>`).join("")}</i></button>`).join("")}</div></section>
+    <section class="mobileCard"><div class="cardHead"><h3>${t("언어")}</h3><span>Language</span></div><div class="themeList"><button class="${state.language === "ko" ? "active" : ""}" data-mobile-language="ko"><span>한국어</span></button><button class="${state.language === "ja" ? "active" : ""}" data-mobile-language="ja"><span>日本語</span></button></div></section>
+    <section class="mobileCard"><div class="cardHead"><h3>${t("동기화")}</h3><span>${state.user?.email || "offline"}</span></div><button class="soft" data-action="syncNow">${t("지금 동기화")}</button><button class="soft" data-action="enableNotifications">${t("알림 권한 켜기")}</button><button class="ghost" data-action="logout">${t("로그아웃")}</button></section>
   </div>`;
 }
 
@@ -307,7 +353,7 @@ function eventCard(event) {
   return `<article class="mEvent ${event.status === "completed" ? "done" : ""}" data-event="${event.id}">
     <i style="background:${color(event.colorIndex)}"></i>
     <div><b>${escapeHtml(event.name)}</b><span>${event.startTime}-${event.endTime} · ${escapeHtml(category(event.categoryId).name)}</span></div>
-    <button data-complete="${event.id}">${event.status === "completed" ? "완료" : "체크"}</button>
+    <button data-complete="${event.id}">${event.status === "completed" ? t("완료") : t("체크")}</button>
   </article>`;
 }
 
@@ -337,32 +383,33 @@ function eventModal() {
   const event = state.editingEvent || {};
   const date = event.date || state.date;
   return `<div class="sheetBackdrop" data-close="1"><form class="bottomSheet" data-form="event">
-    <header><h3>${event.id ? "일정 수정" : "일정 추가"}</h3><button type="button" data-close="1">닫기</button></header>
-    <label>일정명<input name="name" required value="${escapeAttr(event.name || "")}" placeholder="예: 운동"></label>
-    <div class="two"><label>날짜<input type="date" name="date" value="${date}"></label><label>분류<select name="categoryId">${memory.categories.map((cat) => `<option value="${cat.id}" ${event.categoryId === cat.id ? "selected" : ""}>${escapeHtml(cat.name)}</option>`).join("")}</select></label></div>
-    <div class="two"><label>시작<input type="time" name="startTime" value="${event.startTime || "09:00"}" step="1800"></label><label>종료<input type="time" name="endTime" value="${event.endTime || "10:00"}" step="1800"></label></div>
-    <label>메모<textarea name="memo">${escapeHtml(event.memo || "")}</textarea></label>
-    <button class="primary" type="submit">저장</button>
+    <header><h3>${event.id ? t("일정 수정") : t("일정 추가")}</h3><button type="button" data-close="1">${t("닫기")}</button></header>
+    <label>${t("일정명")}<input name="name" required value="${escapeAttr(event.name || "")}" placeholder="예: 운동"></label>
+    <div class="two"><label>${t("날짜")}<input type="date" name="date" value="${date}"></label><label>${t("분류")}<select name="categoryId">${memory.categories.map((cat) => `<option value="${cat.id}" ${event.categoryId === cat.id ? "selected" : ""}>${escapeHtml(cat.name)}</option>`).join("")}</select></label></div>
+    <div class="two"><label>${t("시작")}<input type="time" name="startTime" value="${event.startTime || "09:00"}" step="1800"></label><label>${t("종료")}<input type="time" name="endTime" value="${event.endTime || "10:00"}" step="1800"></label></div>
+    <label>${t("메모")}<textarea name="memo">${escapeHtml(event.memo || "")}</textarea></label>
+    <button class="primary" type="submit">${t("저장")}</button>
   </form></div>`;
 }
 
 function noteModal() {
   return `<div class="sheetBackdrop" data-close="1"><form class="bottomSheet" data-form="note">
-    <header><h3>빠른 메모</h3><button type="button" data-close="1">닫기</button></header>
+    <header><h3>${t("빠른 메모")}</h3><button type="button" data-close="1">${t("닫기")}</button></header>
     <label>제목<input name="title" value="${timestampTitle()}"></label>
-    <label>내용<textarea name="body" required placeholder="나중에 데스크탑에서 다시 볼 내용을 적어두세요."></textarea></label>
-    <button class="primary" type="submit">저장</button>
+    <label>${t("내용")}<textarea name="body" required placeholder="나중에 데스크탑에서 다시 볼 내용을 적어두세요."></textarea></label>
+    <button class="primary" type="submit">${t("저장")}</button>
   </form></div>`;
 }
 
 function settingsModal() {
   return `<div class="sheetBackdrop" data-close="1"><section class="bottomSheet">
-    <header><h3>모바일 설정</h3><button type="button" data-close="1">닫기</button></header>
+    <header><h3>모바일 설정</h3><button type="button" data-close="1">${t("닫기")}</button></header>
     <p class="muted">모바일 테마는 이 기기에만 저장됩니다. 데스크탑 테마와 동기화하지 않습니다.</p>
     <div class="themeList">${Object.entries(themes).map(([key, theme]) => `<button class="${state.theme === key ? "active" : ""}" data-mobile-theme="${key}"><span>${theme.label}</span><i>${theme.colors.map((c) => `<b style="background:${c}"></b>`).join("")}</i></button>`).join("")}</div>
-    <button class="soft" data-action="enableNotifications">알림 권한 켜기</button>
-    <button class="soft" data-action="syncNow">지금 동기화</button>
-    <button class="ghost" data-action="logout">로그아웃</button>
+    <div class="themeList"><button class="${state.language === "ko" ? "active" : ""}" data-mobile-language="ko"><span>한국어</span></button><button class="${state.language === "ja" ? "active" : ""}" data-mobile-language="ja"><span>日本語</span></button></div>
+    <button class="soft" data-action="enableNotifications">${t("알림 권한 켜기")}</button>
+    <button class="soft" data-action="syncNow">${t("지금 동기화")}</button>
+    <button class="ghost" data-action="logout">${t("로그아웃")}</button>
   </section></div>`;
 }
 
@@ -514,6 +561,13 @@ document.addEventListener("click", async (event) => {
     state.theme = target.dataset.mobileTheme;
     localStorage.setItem("planner.mobile.theme", state.theme);
     render();
+    return;
+  }
+  if (target.dataset.mobileLanguage) {
+    state.language = target.dataset.mobileLanguage;
+    localStorage.setItem("planner.mobile.language", state.language);
+    await put("settings", { ...(memory.settings || {}), id: "app", language: state.language, updatedAt: new Date().toISOString() });
+    await refresh(state.language === "ja" ? "言語を変更しました。" : "언어를 변경했습니다.");
     return;
   }
   if (target.dataset.action === "syncNow") {

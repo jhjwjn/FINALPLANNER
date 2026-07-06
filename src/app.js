@@ -195,6 +195,105 @@ const navItems = [
   ["ai", "AI"]
 ];
 
+const JA_TEXT = {
+  "오늘": "今日",
+  "주간계획": "週間計画",
+  "월간계획": "月間計画",
+  "주간대시보드": "週間ダッシュボード",
+  "일간": "日別",
+  "할 일": "To Do",
+  "습관": "習慣",
+  "목표": "目標",
+  "프로젝트": "プロジェクト",
+  "메모": "メモ",
+  "회고": "振り返り",
+  "꿈/비전": "夢/ビジョン",
+  "데이터": "データ",
+  "출력": "印刷",
+  "설정": "設定",
+  "오늘 실행": "今日の実行",
+  "주간 계획": "週間計画",
+  "월간 계획": "月間計画",
+  "주간 대시보드": "週間ダッシュボード",
+  "일간 대시보드": "日別ダッシュボード",
+  "To Do List": "To Do List",
+  "꿈 / 비전": "夢 / ビジョン",
+  "데이터베이스": "データベース",
+  "환경 설정": "環境設定",
+  "AI 에이전트": "AIエージェント",
+  "이번 주": "今週",
+  "로그인": "ログイン",
+  "로그아웃": "ログアウト",
+  "이전주": "前週",
+  "이번주": "今週",
+  "다음주": "次週",
+  "이전달": "前月",
+  "이번달": "今月",
+  "다음달": "次月",
+  "일정 추가": "予定追加",
+  "빠른 추가": "クイック追加",
+  "빠른 메모": "クイックメモ",
+  "할 일 추가": "タスク追加",
+  "습관 추가": "習慣追加",
+  "목표 추가": "目標追加",
+  "프로젝트 추가": "プロジェクト追加",
+  "다음 행동": "次の行動",
+  "메모 추가": "メモ追加",
+  "회고 작성": "振り返り作成",
+  "비전 추가": "ビジョン追加",
+  "일정사전 추가": "予定辞書追加",
+  "카테고리": "カテゴリ",
+  "카테고리 관리": "カテゴリ管理",
+  "백업 내보내기": "バックアップ出力",
+  "백업 가져오기": "バックアップ読込",
+  "연결 확인": "接続確認",
+  "선택 항목 출력": "選択項目を印刷",
+  "프롬프트 복사": "プロンプトコピー",
+  "복사": "コピー",
+  "테마": "テーマ",
+  "데이터 안정성": "データ安定性",
+  "운영 규칙": "運用ルール",
+  "언어": "言語",
+  "한국어": "韓国語",
+  "일본어": "日本語",
+  "추가": "追加",
+  "수정": "編集",
+  "삭제": "削除",
+  "닫기": "閉じる",
+  "저장": "保存",
+  "출력 순서": "印刷順",
+  "추가 가능한 화면": "追加可能な画面",
+  "출력 예시": "印刷プレビュー",
+  "빠른 프리셋": "クイックプリセット",
+  "주간 출력 구성": "週間印刷構成",
+  "월간 출력 구성": "月間印刷構成",
+  "전체 출력 구성": "全体印刷構成",
+  "위": "上",
+  "아래": "下",
+  "제외": "除外",
+  "A4 세로 기준": "A4縦基準",
+  "90도 회전": "90度回転",
+  "세로 A4": "A4縦",
+  "출력할 화면을 선택하세요.": "印刷する画面を選択してください。",
+  "검색 결과가 없습니다.": "検索結果がありません。",
+  "검색어를 입력하세요.": "検索語を入力してください。",
+  "월": "月",
+  "화": "火",
+  "수": "水",
+  "목": "木",
+  "금": "金",
+  "토": "土",
+  "일": "日",
+  "공부": "勉強",
+  "운동": "運動",
+  "독서": "読書",
+  "생활": "生活",
+  "휴식": "休憩",
+  "일정, 목표, 할 일, 메모 검색": "予定、目標、To Do、メモを検索"
+};
+
+const t = (value) => (state.language === "ja" ? JA_TEXT[value] || value : value);
+
 const state = {
   view: "today",
   weekStart: weekStart(today()),
@@ -205,6 +304,7 @@ const state = {
   dataTab: "events",
   query: "",
   theme: "paper",
+  language: "ko",
   modal: null,
   modalData: null,
   drag: null,
@@ -242,7 +342,7 @@ const memory = {
 async function seed() {
   const settings = await get("settings", "app");
   if (!settings) {
-    await put("settings", { id: "app", theme: "paper", weekStart: "월", focusMode: false, updatedAt: new Date().toISOString() });
+    await put("settings", { id: "app", theme: "paper", language: "ko", weekStart: "월", focusMode: false, updatedAt: new Date().toISOString() });
   }
   await ensureDefaultCategories();
 }
@@ -266,12 +366,39 @@ async function ensureDefaultCategories() {
 
 async function cleanupDuplicateSeedData() {
   await ensureDefaultCategories();
+  await cleanupLegacyDemoData();
   await cleanupDuplicateCategories();
   await cleanupDuplicateRecords("schedule_templates", (item) => String(item.name || "").trim().toLowerCase());
   await cleanupDuplicateRecords("schedule_events", (item) => [item.name, item.date, item.startTime, item.endTime].map((x) => String(x || "").trim().toLowerCase()).join("|"));
   await cleanupDuplicateRecords("goals", (item) => [item.name, item.period, item.startDate, item.endDate].map((x) => String(x || "").trim().toLowerCase()).join("|"));
   await cleanupDuplicateRecords("tasks", (item) => [item.name, item.dueDate, item.projectId || ""].map((x) => String(x || "").trim().toLowerCase()).join("|"));
   await cleanupDuplicateRecords("habits", (item) => String(item.name || "").trim().toLowerCase());
+}
+
+const legacyDemoNames = {
+  schedule_events: ["전자기학 2장", "웨이트", "프로젝트 설계", "독서", "모의고사 복습"],
+  schedule_templates: ["전자기학 공부", "웨이트", "독서", "프로젝트 설계"],
+  tasks: ["전자기학 오답 정리", "주간 계획 빈 시간 확인", "프로젝트 DB 구조 메모", "오늘 화면 설계 정리", "습관 기록 UI 검토", "수면 루틴 시간 고정"],
+  habits: ["기상 후 물 마시기", "운동", "독서 20분", "취침 전 회고"],
+  goals: ["전자기학 핵심 개념 3개 설명 가능", "운동 4회 완료", "독서 2챕터 요약"],
+  projects: ["Planner 앱 완성", "개인 루틴 안정화"],
+  notes: ["일정관리 원칙", "AI에게 물어볼 것"],
+  dreams: ["1년 뒤의 나", "건강한 생활"]
+};
+
+function demoNameKey(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+async function cleanupLegacyDemoData() {
+  for (const [store, names] of Object.entries(legacyDemoNames)) {
+    const targets = new Set(names.map(demoNameKey));
+    const values = await all(store);
+    for (const item of values) {
+      const name = demoNameKey(item.name || item.title);
+      if (targets.has(name)) await remove(store, item.id);
+    }
+  }
 }
 
 async function syncRemoteAndCleanup() {
@@ -381,6 +508,7 @@ function dreamSeed(title, body, area) {
 async function load() {
   memory.settings = await get("settings", "app");
   state.theme = memory.settings?.theme || "paper";
+  state.language = memory.settings?.language || "ko";
   memory.categories = (await all("categories")).filter((x) => x.isActive !== false).sort((a, b) => a.sortOrder - b.sortOrder);
   memory.templates = (await all("schedule_templates")).filter((x) => x.isActive !== false);
   memory.events = await all("schedule_events");
@@ -400,6 +528,8 @@ function applyTheme() {
   const theme = themes[state.theme] || themes.paper;
   Object.entries(theme.vars).forEach(([key, value]) => document.documentElement.style.setProperty(`--${key}`, value));
   document.documentElement.dataset.theme = theme.dark ? "dark" : "light";
+  document.documentElement.dataset.lang = state.language;
+  document.documentElement.lang = state.language === "ja" ? "ja" : "ko";
 }
 
 function category(id) {
@@ -519,13 +649,13 @@ function appShell() {
           <p>offline workspace</p>
         </div>
       </div>
-      <nav>${navItems.map(([id, label]) => `<button class="navItem ${state.view === id ? "active" : ""}" data-view="${id}">${label}</button>`).join("")}</nav>
+      <nav>${navItems.map(([id, label]) => `<button class="navItem ${state.view === id ? "active" : ""}" data-view="${id}">${t(label)}</button>`).join("")}</nav>
       <div class="sidebarCard">
-        <span>이번 주</span>
+        <span>${t("이번 주")}</span>
         <strong>${fmtMD(state.weekStart)} - ${fmtMD(addDays(state.weekStart, 6))}</strong>
         <div class="swatches">${theme.colors.map((c) => `<i style="background:${c}"></i>`).join("")}</div>
       </div>
-      ${state.authUser ? `<div class="sidebarCard"><span>로그인</span><strong>${escapeHtml(state.authUser.email || "Google 사용자")}</strong><button class="ghost full" data-action="signOut">로그아웃</button></div>` : ""}
+      ${state.authUser ? `<div class="sidebarCard"><span>${t("로그인")}</span><strong>${escapeHtml(state.authUser.email || "Google 사용자")}</strong><button class="ghost full" data-action="signOut">${t("로그아웃")}</button></div>` : ""}
     </aside>
     <main class="main ${actions ? "" : "noActions"}">
       <header class="topbar">
@@ -533,7 +663,7 @@ function appShell() {
           <p class="eyebrow">${theme.label}</p>
           <h2>${viewTitle()}</h2>
         </div>
-        <div class="topSearch"><input class="globalSearch" value="${escapeAttr(state.query)}" placeholder="일정, 목표, 할 일, 메모 검색"></div>
+        <div class="topSearch"><input class="globalSearch" value="${escapeAttr(state.query)}" placeholder="${t("일정, 목표, 할 일, 메모 검색")}"></div>
         <div class="topActions">${renderTopActions()}</div>
       </header>
       ${renderSearchOverlay()}
@@ -588,7 +718,7 @@ function renderTutorial() {
 }
 
 function viewTitle() {
-  return ({
+  return t(({
     today: "오늘 실행",
     planner: "주간 계획",
     monthly: "월간 계획",
@@ -605,25 +735,25 @@ function viewTitle() {
     print: "출력",
     settings: "환경 설정",
     ai: "AI 에이전트"
-  })[state.view];
+  })[state.view]);
 }
 
 function renderTopActions() {
-  const weekNav = `<button class="ghost" data-action="prevWeek">이전주</button><button class="ghost" data-action="thisWeek">이번주</button><button class="ghost" data-action="nextWeek">다음주</button>`;
-  if (state.view === "today") return `<button class="primary" data-modal="quickAdd">빠른 추가</button><button class="soft" data-modal="note">빠른 메모</button>`;
-  if (["planner", "dashboard", "daily"].includes(state.view)) return `${weekNav}<button class="primary" data-modal="event">일정 추가</button>`;
-  if (state.view === "monthly") return `<button class="ghost" data-action="prevMonth">이전달</button><button class="ghost" data-action="thisMonth">이번달</button><button class="ghost" data-action="nextMonth">다음달</button><button class="primary" data-modal="event">일정 추가</button>`;
-  if (state.view === "tasks") return `<button class="primary" data-modal="task">할 일 추가</button>`;
-  if (state.view === "habits") return `<button class="primary" data-modal="habit">습관 추가</button>`;
-  if (state.view === "goals") return `<button class="primary" data-modal="goal">목표 추가</button>`;
-  if (state.view === "projects") return `<button class="primary" data-modal="project">프로젝트 추가</button><button class="soft" data-modal="task">다음 행동</button>`;
-  if (state.view === "notes") return `<button class="primary" data-modal="note">메모 추가</button>`;
-  if (state.view === "review") return `<button class="primary" data-modal="review">회고 작성</button>`;
-  if (state.view === "dreams") return `<button class="primary" data-modal="dream">비전 추가</button>`;
-  if (state.view === "database") return `<button class="primary" data-modal="template">일정사전 추가</button><button class="soft" data-modal="category">카테고리</button>`;
-  if (state.view === "print") return `<button class="primary" data-action="printSelected">선택 항목 출력</button>`;
-  if (state.view === "settings") return `<button class="primary" data-action="exportBackup">백업 내보내기</button><button class="soft" data-action="importBackup">백업 가져오기</button><button class="soft" data-action="checkSupabase">연결 확인</button><input class="backupInput" type="file" accept="application/json,.json" hidden>`;
-  if (state.view === "ai") return `<button class="primary" data-action="copyPrompt">프롬프트 복사</button>`;
+  const weekNav = `<button class="ghost" data-action="prevWeek">${t("이전주")}</button><button class="ghost" data-action="thisWeek">${t("이번주")}</button><button class="ghost" data-action="nextWeek">${t("다음주")}</button>`;
+  if (state.view === "today") return `<button class="primary" data-modal="quickAdd">${t("빠른 추가")}</button><button class="soft" data-modal="note">${t("빠른 메모")}</button>`;
+  if (["planner", "dashboard", "daily"].includes(state.view)) return `${weekNav}<button class="primary" data-modal="event">${t("일정 추가")}</button>`;
+  if (state.view === "monthly") return `<button class="ghost" data-action="prevMonth">${t("이전달")}</button><button class="ghost" data-action="thisMonth">${t("이번달")}</button><button class="ghost" data-action="nextMonth">${t("다음달")}</button><button class="primary" data-modal="event">${t("일정 추가")}</button>`;
+  if (state.view === "tasks") return `<button class="primary" data-modal="task">${t("할 일 추가")}</button>`;
+  if (state.view === "habits") return `<button class="primary" data-modal="habit">${t("습관 추가")}</button>`;
+  if (state.view === "goals") return `<button class="primary" data-modal="goal">${t("목표 추가")}</button>`;
+  if (state.view === "projects") return `<button class="primary" data-modal="project">${t("프로젝트 추가")}</button><button class="soft" data-modal="task">${t("다음 행동")}</button>`;
+  if (state.view === "notes") return `<button class="primary" data-modal="note">${t("메모 추가")}</button>`;
+  if (state.view === "review") return `<button class="primary" data-modal="review">${t("회고 작성")}</button>`;
+  if (state.view === "dreams") return `<button class="primary" data-modal="dream">${t("비전 추가")}</button>`;
+  if (state.view === "database") return `<button class="primary" data-modal="template">${t("일정사전 추가")}</button><button class="soft" data-modal="category">${t("카테고리")}</button>`;
+  if (state.view === "print") return `<button class="primary" data-action="printSelected">${t("선택 항목 출력")}</button>`;
+  if (state.view === "settings") return `<button class="primary" data-action="exportBackup">${t("백업 내보내기")}</button><button class="soft" data-action="importBackup">${t("백업 가져오기")}</button><button class="soft" data-action="checkSupabase">${t("연결 확인")}</button><input class="backupInput" type="file" accept="application/json,.json" hidden>`;
+  if (state.view === "ai") return `<button class="primary" data-action="copyPrompt">${t("프롬프트 복사")}</button>`;
   return "";
 }
 
@@ -1192,6 +1322,14 @@ function renderSettings() {
         </button>`).join("")}</div>
     </section>
     <section class="card">
+      <div class="cardHead"><h3>${t("언어")}</h3><span>Language</span></div>
+      <div class="languageToggle">
+        <button class="${state.language === "ko" ? "active" : ""}" data-language="ko">한국어</button>
+        <button class="${state.language === "ja" ? "active" : ""}" data-language="ja">日本語</button>
+      </div>
+      <p class="tiny">언어 설정은 이 계정의 설정 데이터에 저장됩니다.</p>
+    </section>
+    <section class="card">
       <div class="cardHead"><h3>데이터 안정성</h3><span>Local-first</span></div>
       <p class="muted">모든 변경은 먼저 현재 기기의 IndexedDB에 저장됩니다. 인터넷이 끊겨도 조회, 추가, 수정이 가능하며 Supabase가 연결되어 있으면 온라인 상태에서 원격 DB로 동기화됩니다.</p>
       <div class="settingRows">
@@ -1595,8 +1733,34 @@ async function refresh(toast = "") {
   if (toast) setTimeout(() => { state.toast = ""; render(); }, 3200);
 }
 
+function applyLanguage() {
+  if (state.language !== "ja") return;
+  const root = $("#app");
+  if (!root) return;
+  const excludedSelector = "input, textarea, .eventChip, .eventPill, .eventRow, .taskRow, .goalCard, .projectCard, .dreamCard, .noteItem, .searchResult";
+  const nodes = [];
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      const value = node.nodeValue.trim();
+      if (!value || !JA_TEXT[value]) return NodeFilter.FILTER_REJECT;
+      if (node.parentElement?.closest(excludedSelector)) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    }
+  });
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  nodes.forEach((node) => {
+    const value = node.nodeValue.trim();
+    node.nodeValue = node.nodeValue.replace(value, JA_TEXT[value]);
+  });
+  $$("[placeholder]").forEach((element) => {
+    const value = element.getAttribute("placeholder");
+    if (JA_TEXT[value]) element.setAttribute("placeholder", JA_TEXT[value]);
+  });
+}
+
 function render(focusSearch = false) {
   $("#app").innerHTML = appShell();
+  applyLanguage();
   if (focusSearch) {
     const input = $(".searchLarge") || $(".globalSearch");
     if (input) {
@@ -2065,6 +2229,12 @@ document.addEventListener("click", async (event) => {
     state.theme = target.dataset.theme;
     await put("settings", { ...memory.settings, id: "app", theme: state.theme, updatedAt: new Date().toISOString() });
     await refresh("테마를 변경했습니다.");
+    return;
+  }
+  if (target.dataset.language) {
+    state.language = target.dataset.language;
+    await put("settings", { ...memory.settings, id: "app", language: state.language, updatedAt: new Date().toISOString() });
+    await refresh(state.language === "ja" ? "言語を変更しました。" : "언어를 변경했습니다.");
     return;
   }
   if (target.dataset.editCategory) {

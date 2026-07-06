@@ -1181,6 +1181,24 @@ td button {
 .themeCard span { color: var(--muted); font-size: 11px; font-weight: 900; }
 .themeCard i { display: flex; gap: 5px; font-style: normal; }
 .themeCard b { width: 20px; height: 20px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, .45); }
+.languageToggle {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.languageToggle button {
+  min-height: 46px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: var(--soft);
+  color: var(--text);
+  font-weight: 900;
+}
+.languageToggle button.active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, var(--card));
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
 .settingRows { display: grid; gap: 9px; }
 .settingRows.twoCols { grid-template-columns: 1fr 1fr; }
 .settingRows article {
