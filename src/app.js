@@ -535,8 +535,8 @@ function appShell() {
         </div>
         <div class="topSearch"><input class="globalSearch" value="${escapeAttr(state.query)}" placeholder="일정, 목표, 할 일, 메모 검색"></div>
         <div class="topActions">${renderTopActions()}</div>
-        ${renderSearchOverlay()}
       </header>
+      ${renderSearchOverlay()}
       ${actions ? `<section class="actionPanel">${actions}</section>` : ""}
       <section class="content">${renderView()}</section>
     </main>
@@ -1136,10 +1136,21 @@ function renderPrint() {
   const rest = printOptions().filter(([id]) => !selected.has(id));
   return `<div class="printGrid">
     <section class="card">
+      <div class="cardHead"><h3>추가 가능한 화면</h3><span>${rest.length}개</span></div>
+      <div class="printPresets">
+        <button class="soft" data-print-preset="week">주간 출력 구성</button>
+        <button class="soft" data-print-preset="month">월간 출력 구성</button>
+        <button class="soft" data-print-preset="all">전체 출력 구성</button>
+      </div>
+      <div class="printAddList">
+        ${rest.map(([id, label, desc]) => `<button data-print-toggle="${id}"><b>${label}</b><span>${desc}</span></button>`).join("") || empty("모든 화면이 선택되었습니다.")}
+      </div>
+    </section>
+    <section class="card">
       <div class="cardHead"><h3>출력 순서</h3><button data-action="printSelected">출력</button></div>
       <div class="printOrder">
-        ${ordered.map(([id, label, desc], index) => `<article>
-          <b>${label}</b><span>${desc}</span>
+        ${ordered.map(([id, label], index) => `<article>
+          <b>${label}</b>
           <button data-print-move="${id}" data-dir="-1" ${index === 0 ? "disabled" : ""}>위</button>
           <button data-print-move="${id}" data-dir="1" ${index === ordered.length - 1 ? "disabled" : ""}>아래</button>
           <button class="dangerText" data-print-toggle="${id}">제외</button>
@@ -1147,20 +1158,19 @@ function renderPrint() {
       </div>
     </section>
     <section class="card">
-      <div class="cardHead"><h3>추가 가능한 화면</h3><span>${rest.length}개</span></div>
-      <div class="printAddList">
-        ${rest.map(([id, label, desc]) => `<button data-print-toggle="${id}"><b>${label}</b><span>${desc}</span></button>`).join("") || empty("모든 화면이 선택되었습니다.")}
-      </div>
-    </section>
-    <section class="card wide">
-      <div class="cardHead"><h3>빠른 프리셋</h3><span>필요하면 순서를 다시 조정하세요</span></div>
-      <div class="inlineActions">
-        <button class="soft" data-print-preset="week">주간 출력 구성</button>
-        <button class="soft" data-print-preset="month">월간 출력 구성</button>
-        <button class="soft" data-print-preset="all">전체 출력 구성</button>
-      </div>
+      <div class="cardHead"><h3>출력 예시</h3><span>A4 세로 기준</span></div>
+      <div class="printPreview">${renderPrintPreview(ordered)}</div>
     </section>
   </div>`;
+}
+
+function renderPrintPreview(items) {
+  if (!items.length) return empty("출력할 화면을 선택하세요.");
+  return items.map(([id, label], index) => `<article class="previewPage ${id === "dashboard" ? "rotated" : ""}">
+    <span>${index + 1}</span>
+    <b>${label}</b>
+    <em>${id === "dashboard" ? "90도 회전" : "세로 A4"}</em>
+  </article>`).join("");
 }
 
 function renderSettings() {
@@ -1261,18 +1271,22 @@ function openPrintDocument(items = state.printItems) {
     return;
   }
   win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${label}</title><link rel="stylesheet" href="src/styles.css"><style>
-    body{background:#fff;padding:24px;color:#111;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    body{background:#fff;padding:0;color:#111;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
     .printDoc{display:grid;gap:22px}
-    .printPage{break-after:page;padding:8px}
-    .printPage h1{margin:0 0 14px;font-size:22px}
+    .printPage{break-after:page;width:190mm;height:277mm;padding:8mm;box-sizing:border-box;overflow:hidden;position:relative;background:#fff}
+    .printPage h1{margin:0 0 10px;font-size:20px}
+    .printBody{width:100%;height:calc(100% - 36px);overflow:hidden}
+    .printPage.dashboardPrint .printBody{position:absolute;left:8mm;top:8mm;width:174mm;height:261mm}
+    .printPage.dashboardPrint .rotateWrap{position:absolute;left:174mm;top:0;width:261mm;height:174mm;transform:rotate(90deg);transform-origin:top left;overflow:hidden}
+    .printPage.dashboardPrint h1{position:absolute;left:8mm;top:8mm;z-index:2;background:#fff;padding-right:8px}
     .content{height:auto;overflow:visible;padding:0}
     .sidebar,.topbar,.actionPanel,.modalBackdrop,.searchOverlay,.toast,input,textarea,select,.cardHead button,.miniActions,.goalStepper{display:none!important}
     button{display:block!important}
     .main{display:block!important;border:0!important;box-shadow:none!important;background:#fff!important}
     .plannerGrid,.monthlyGrid,.dailyBoard,.weekTimeline{min-width:0!important;width:100%!important;overflow:hidden!important}
     .card,.heroCard,.metric,.lane,.goalCard,.projectCard,.dreamCard{box-shadow:none!important;break-inside:avoid}
-    @page{size:A4 landscape;margin:10mm}
-  </style></head><body><main class="printDoc">${sections.map((section) => `<section class="printPage"><h1>${section.title}</h1>${section.html}</section>`).join("")}</main><script>setTimeout(()=>window.print(),350)</script></body></html>`);
+    @page{size:A4 portrait;margin:0}
+  </style></head><body><main class="printDoc">${sections.map((section) => `<section class="printPage ${section.id === "dashboard" ? "dashboardPrint" : ""}"><h1>${section.title}</h1><div class="printBody">${section.id === "dashboard" ? `<div class="rotateWrap">${section.html}</div>` : section.html}</div></section>`).join("")}</main><script>setTimeout(()=>window.print(),350)</script></body></html>`);
   win.document.close();
 }
 
@@ -1293,7 +1307,7 @@ function printSections(items = state.printItems) {
     dreams: renderDreams,
     database: renderDatabase
   };
-  return items.filter((id) => renderers[id]).map((id) => ({ title: titles[id] || id, html: renderers[id]() }));
+  return items.filter((id) => renderers[id]).map((id) => ({ id, title: titles[id] || id, html: renderers[id]() }));
 }
 
 function eventRow(event) {

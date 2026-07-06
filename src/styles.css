@@ -123,6 +123,7 @@ nav {
 .swatches { display: flex; gap: 6px; margin-top: 12px; }
 .swatches i { width: 18px; height: 18px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, .45); }
 .main {
+  position: relative;
   min-width: 0;
   min-height: 0;
   height: 100%;
@@ -132,7 +133,7 @@ nav {
   border-radius: 24px;
   background: color-mix(in srgb, var(--shell) 86%, transparent);
   box-shadow: var(--shadow);
-  overflow: hidden;
+  overflow: visible;
 }
 .main.noActions {
   grid-template-rows: 70px minmax(0, 1fr);
@@ -185,7 +186,7 @@ nav {
   left: 50%;
   width: min(760px, calc(100% - 40px));
   max-height: min(72vh, 680px);
-  z-index: 38;
+  z-index: 120;
   display: grid;
   gap: 12px;
   padding: 10px;
@@ -234,13 +235,19 @@ nav {
 }
 .printGrid {
   display: grid;
-  grid-template-columns: 1.1fr .9fr;
+  grid-template-columns: minmax(240px, .72fr) minmax(300px, .95fr) minmax(260px, .78fr);
   gap: 14px;
+  align-items: start;
+}
+.printPresets {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 .printOrder,
 .printAddList {
   display: grid;
-  gap: 10px;
+  gap: 7px;
 }
 .printOrder article,
 .printAddList button {
@@ -248,10 +255,10 @@ nav {
   grid-template-columns: 1fr auto auto auto;
   gap: 8px;
   align-items: center;
-  min-height: 54px;
-  padding: 10px 12px;
+  min-height: 42px;
+  padding: 8px 10px;
   border: 1px solid var(--line);
-  border-radius: 15px;
+  border-radius: 13px;
   background: var(--soft);
   text-align: left;
 }
@@ -263,8 +270,58 @@ nav {
 .printOrder span,
 .printAddList span {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
+}
+.printPreview {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+}
+.previewPage {
+  position: relative;
+  width: min(210px, 100%);
+  aspect-ratio: 210 / 297;
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--line) 34%, transparent) 1px, transparent 1px),
+    linear-gradient(color-mix(in srgb, var(--line) 34%, transparent) 1px, transparent 1px),
+    var(--card);
+  background-size: 22px 22px;
+}
+.previewPage.rotated:before {
+  content: "";
+  position: absolute;
+  width: 72%;
+  height: 42%;
+  border: 2px solid var(--accent);
+  border-radius: 10px;
+  transform: rotate(90deg);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.previewPage span {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+}
+.previewPage b,
+.previewPage em {
+  position: relative;
+  z-index: 2;
+}
+.previewPage em {
+  color: var(--muted);
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 900;
 }
 .searchResult em {
   color: var(--muted);
