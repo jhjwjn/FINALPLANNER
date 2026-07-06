@@ -1142,8 +1142,8 @@ function renderHabits() {
 }
 
 function renderGoals() {
-  const goals = filtered(memory.goals);
-  return `<div class="categoryStrip">${categoryPills()}</div><div class="goalBoard">${goals.map((goal) => `
+  const goals = queryFiltered(memory.goals);
+  return `<div class="goalBoard">${goals.map((goal) => `
     <article class="goalCard" data-goal="${goal.id}">
       <div class="goalTop"><span>${goal.period}</span><b>${goal.status}</b></div>
       <h3>${goal.name}</h3>
@@ -1154,7 +1154,7 @@ function renderGoals() {
       </div>
       <p>${category(goal.categoryId).name} · ${goal.startDate} ~ ${goal.endDate}</p>
       <div class="miniActions"><button data-edit-goal="${goal.id}">수정</button><button class="dangerText" data-delete-goal="${goal.id}">삭제</button></div>
-    </article>`).join("")}</div>`;
+    </article>`).join("") || empty("등록된 목표가 없습니다.")}</div>`;
 }
 
 function renderProjects() {
@@ -1964,7 +1964,11 @@ function askDelete(kind) {
 }
 
 document.addEventListener("click", async (event) => {
-  if (Date.now() < state.suppressClickUntil) return;
+  if (Date.now() < state.suppressClickUntil) {
+    event.preventDefault();
+    event.stopPropagation();
+    return;
+  }
   if (event.target.dataset.close) {
     state.modal = null;
     state.modalData = null;
@@ -2061,6 +2065,7 @@ document.addEventListener("click", async (event) => {
   if (target.dataset.view) {
     state.view = target.dataset.view;
     state.searchOpen = false;
+    state.selectedCategory = "all";
     render();
     return;
   }
@@ -2364,6 +2369,11 @@ document.addEventListener("click", async (event) => {
   }
 });
 
+document.addEventListener("submit", async (event) => {
+  if (!event.target.matches("[data-form]")) return;
+  await handleSubmit(event);
+});
+
 document.addEventListener("input", (event) => {
   if (event.target.matches(".globalSearch")) {
     if (state.isComposing || event.isComposing) return;
@@ -2512,7 +2522,7 @@ document.addEventListener("mousemove", (event) => {
   }
 });
 
-document.addEventListener("mouseup", async () => {
+document.addEventListener("mouseup", async (event) => {
   if (!state.drag) return;
 
   const drag = state.drag;
@@ -2521,7 +2531,7 @@ document.addEventListener("mouseup", async () => {
 
   if (drag.type === "move") {
     if (drag.moved && drag.targetSlot) {
-      state.suppressClickUntil = Date.now() + 350;
+      state.suppressClickUntil = Date.now() + 900;
       await moveEventToSlot(drag.eventId, drag.targetSlot);
     }
     return;
@@ -2529,7 +2539,7 @@ document.addEventListener("mouseup", async () => {
 
   if (drag.type === "monthMove") {
     if (drag.moved && drag.targetSlot) {
-      state.suppressClickUntil = Date.now() + 350;
+      state.suppressClickUntil = Date.now() + 900;
       await moveEventToMonthDay(drag.eventId, drag.targetSlot);
     }
     return;
@@ -2542,7 +2552,9 @@ document.addEventListener("mouseup", async () => {
     const startTime = timeFromMinutes(start);
     const endTime = timeFromMinutes(end);
 
-    state.suppressClickUntil = Date.now() + 350;
+    state.suppressClickUntil = Date.now() + 900;
+    event.preventDefault();
+    event.stopPropagation();
     openEventModal({
       date: drag.date,
       startTime,
