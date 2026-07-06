@@ -89,6 +89,7 @@ const JA_TEXT = {
   "일정": "予定",
   "메모": "メモ",
   "설정": "設定",
+  "친구": "友だち",
   "오늘": "今日",
   "빠른 메모": "クイックメモ",
   "이전": "前",
@@ -133,6 +134,7 @@ const state = {
   toast: "",
   theme: localStorage.getItem("planner.mobile.theme") || "paper",
   language: localStorage.getItem("planner.mobile.language") || "ko",
+  friendPlan: null,
   offlineMode: false
 };
 
@@ -188,6 +190,42 @@ function dayEvents(date = state.date) {
 function weekDates() {
   return Array.from({ length: 7 }, (_, i) => addDays(state.weekStart, i));
 }
+function weekEvents() {
+  const start = state.weekStart;
+  const end = addDays(start, 6);
+  return memory.events.filter((event) => event.date >= start && event.date <= end);
+}
+function encodeSharePayload(payload) {
+  return btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+}
+function decodeSharePayload(code) {
+  const payload = JSON.parse(decodeURIComponent(escape(atob(String(code || "").trim()))));
+  if (payload.type !== "planner-week" || !Array.isArray(payload.events)) throw new Error("invalid");
+  return payload;
+}
+function createWeekShareCode() {
+  return encodeSharePayload({
+    type: "planner-week",
+    version: 1,
+    owner: state.user?.email || "친구",
+    weekStart: state.weekStart,
+    weekEnd: addDays(state.weekStart, 6),
+    createdAt: new Date().toISOString(),
+    events: weekEvents().map((event) => ({
+      name: event.name,
+      date: event.date,
+      startTime: event.startTime,
+      endTime: event.endTime,
+      categoryName: category(event.categoryId).name,
+      colorIndex: event.colorIndex,
+      memo: event.memo || "",
+      status: event.status
+    })),
+    goals: memory.goals
+      .filter((goal) => goal.period === "weekly" && goal.startDate <= addDays(state.weekStart, 6) && goal.endDate >= state.weekStart)
+      .map((goal) => ({ name: goal.name, current: goal.current || 0, target: goal.target || 1, unit: goal.unit || "" }))
+  });
+}
 
 function monthDates() {
   const start = weekStart(monthStart(state.monthStart));
@@ -233,6 +271,7 @@ function appView() {
     <footer class="mBottom">
       <button class="${state.view === "main" ? "active" : ""}" data-view="main">${t("메인")}</button>
       <button class="${state.view === "calendar" ? "active" : ""}" data-view="calendar">${t("일정")}</button>
+      <button class="${state.view === "friends" ? "active" : ""}" data-view="friends">${t("친구")}</button>
       <button class="${state.view === "memo" ? "active" : ""}" data-view="memo">${t("메모")}</button>
       <button class="${state.view === "settings" ? "active" : ""}" data-view="settings">${t("설정")}</button>
     </footer>
@@ -244,6 +283,7 @@ function appView() {
 
 function title() {
   if (state.view === "main") return t("오늘");
+  if (state.view === "friends") return t("친구");
   if (state.view === "memo") return t("빠른 메모");
   if (state.view === "settings") return t("설정");
   if (state.calendarView === "day") return fmtFull(state.date);
@@ -255,6 +295,7 @@ function title() {
 function content() {
   if (state.view === "main") return mainView();
   if (state.view === "memo") return memoView();
+  if (state.view === "friends") return friendsView();
   if (state.view === "settings") return mobileSettingsView();
   if (state.calendarView === "week") return weekView();
   if (state.calendarView === "month") return monthView();
@@ -289,6 +330,29 @@ function memoView() {
     ${latestNotes.map(noteMini).join("") || empty("메모가 없습니다.")}
     <button class="bottomAction primary" data-action="quickNote">${t("새 메모")}</button>
   </div>`;
+}
+
+function friendsView() {
+  const plan = state.friendPlan;
+  return `<div class="mainStack">
+    <section class="mobileCard">
+      <div class="cardHead"><h3>친구 일정</h3><button data-action="copyShareCode">내 코드</button></div>
+      <textarea id="mobileFriendCode" class="friendCodeArea" placeholder="친구 주간 코드 붙여넣기"></textarea>
+      <button class="primary" data-action="loadFriendCode">친구 일정 보기</button>
+    </section>
+    <section class="mobileCard">
+      <div class="cardHead"><h3>${plan ? escapeHtml(plan.owner || "친구") : "친구 주간계획"}</h3><span>${plan ? `${fmtMD(plan.weekStart)}-${fmtMD(plan.weekEnd)}` : ""}</span></div>
+      ${plan ? friendEventList(plan) : empty("친구 코드를 입력하면 일정이 표시됩니다.")}
+    </section>
+  </div>`;
+}
+
+function friendEventList(plan) {
+  const events = [...plan.events].sort((a, b) => `${a.date} ${a.startTime}`.localeCompare(`${b.date} ${b.startTime}`));
+  return events.map((event) => `<article class="mEvent readonly">
+    <i style="background:${color(event.colorIndex)}"></i>
+    <div><b>${escapeHtml(event.name)}</b><span>${fmtMD(event.date)} ${event.startTime}-${event.endTime} · ${escapeHtml(event.categoryName || "")}</span></div>
+  </article>`).join("") || empty("공유된 일정이 없습니다.");
 }
 
 function mobileSettingsView() {
@@ -555,6 +619,20 @@ document.addEventListener("click", async (event) => {
   if (target.dataset.action === "quickNote") {
     state.modal = "note";
     render();
+    return;
+  }
+  if (target.dataset.action === "copyShareCode") {
+    await navigator.clipboard.writeText(createWeekShareCode());
+    await refresh("이번 주 공유 코드를 복사했습니다.");
+    return;
+  }
+  if (target.dataset.action === "loadFriendCode") {
+    try {
+      state.friendPlan = decodeSharePayload($("#mobileFriendCode")?.value || "");
+      render();
+    } catch (error) {
+      showToast("친구 코드를 읽지 못했습니다.");
+    }
     return;
   }
   if (target.dataset.mobileTheme) {

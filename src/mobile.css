@@ -562,7 +562,7 @@ html, body, * { scrollbar-width: none; }
 .mBottom {
   grid-row: 5;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 7px;
   padding: 8px;
   border: 1px solid var(--line);
@@ -674,6 +674,17 @@ html, body, * { scrollbar-width: none; }
   height: 16px;
   border-radius: 7px;
 }
+.friendCodeArea {
+  width: 100%;
+  min-height: 120px;
+  margin: 10px 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--soft);
+  color: var(--text);
+}
+.mEvent.readonly button { display: none; }
 .mToast {
   position: fixed;
   left: 16px;

@@ -839,6 +839,24 @@ nav {
   cursor: grabbing;
 }
 .dashboardGrid { grid-template-columns: repeat(3, 1fr); }
+.friendGrid {
+  display: grid;
+  grid-template-columns: minmax(320px, .8fr) 1.6fr;
+  gap: 14px;
+}
+.friendGrid .wide { grid-column: 1 / -1; }
+.friendGrid .wide2 { min-width: 0; }
+.shareCodeInput {
+  width: 100%;
+  min-height: 150px;
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--soft);
+  color: var(--text);
+  resize: vertical;
+}
 .metric {
   padding: 16px;
   min-height: 106px;
@@ -850,7 +868,7 @@ nav {
 .metric em { color: var(--accent); font-style: normal; font-weight: 900; }
 .weekTimeline {
   display: grid;
-  min-width: 1040px;
+  min-width: 980px;
   border: 1px solid var(--line);
   border-radius: 18px;
   overflow: hidden;
@@ -871,7 +889,7 @@ nav {
   font-weight: 900;
 }
 .timelineDayLabel {
-  width: 48px;
+  width: 42px;
   min-height: 38px;
   flex-direction: column;
   gap: 1px;
@@ -885,6 +903,7 @@ nav {
   position: relative;
   display: grid;
   grid-template-columns: repeat(var(--slots), minmax(20px, 1fr));
+  grid-column: 2 / -1;
   min-height: 38px;
   border-bottom: 1px solid var(--line);
 }
@@ -1497,7 +1516,7 @@ td button {
 
 @media (max-width: 1180px) {
   #app { grid-template-columns: 160px 1fr; }
-  .todayGrid, .dashboardGrid, .reviewGrid, .goalBoard, .projectGrid, .dreamBoard, .dataGrid, .settingsGrid, .notesGrid { grid-template-columns: 1fr 1fr; }
+  .todayGrid, .dashboardGrid, .reviewGrid, .goalBoard, .projectGrid, .dreamBoard, .dataGrid, .settingsGrid, .notesGrid, .friendGrid { grid-template-columns: 1fr 1fr; }
   .aiGrid { grid-template-columns: 220px 1fr; }
   .aiPage { grid-template-columns: 1fr; }
   .wide, .wide2, .full { grid-column: 1 / -1; }
@@ -1579,7 +1598,7 @@ td button {
     scroll-padding-bottom: 80px;
     overflow: auto;
   }
-  .todayGrid, .dashboardGrid, .reviewGrid, .goalBoard, .projectGrid, .dreamBoard, .settingsGrid, .notesGrid, .aiGrid { grid-template-columns: 1fr; }
+  .todayGrid, .dashboardGrid, .reviewGrid, .goalBoard, .projectGrid, .dreamBoard, .settingsGrid, .notesGrid, .aiGrid, .friendGrid { grid-template-columns: 1fr; }
   .printGrid { grid-template-columns: 1fr; }
   .aiChoiceGrid { grid-template-columns: 1fr; }
   .kanban { grid-template-columns: repeat(2, minmax(220px, 1fr)); }
@@ -1637,7 +1656,7 @@ td button {
   .monthlyGrid {
     min-width: 620px;
   }
-  .todayGrid, .dashboardGrid, .reviewGrid, .goalBoard, .projectGrid, .dreamBoard, .dataGrid, .settingsGrid, .notesGrid, .aiGrid {
+  .todayGrid, .dashboardGrid, .reviewGrid, .goalBoard, .projectGrid, .dreamBoard, .dataGrid, .settingsGrid, .notesGrid, .aiGrid, .friendGrid {
     gap: 10px;
   }
   .card, .heroCard { padding: 14px; }

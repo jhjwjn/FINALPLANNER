@@ -190,6 +190,7 @@ const navItems = [
   ["review", "회고"],
   ["dreams", "꿈/비전"],
   ["database", "데이터"],
+  ["friends", "친구"],
   ["print", "출력"],
   ["settings", "설정"],
   ["ai", "AI"]
@@ -209,6 +210,7 @@ const JA_TEXT = {
   "회고": "振り返り",
   "꿈/비전": "夢/ビジョン",
   "데이터": "データ",
+  "친구": "友だち",
   "출력": "印刷",
   "설정": "設定",
   "오늘 실행": "今日の実行",
@@ -249,6 +251,7 @@ const JA_TEXT = {
   "연결 확인": "接続確認",
   "선택 항목 출력": "選択項目を印刷",
   "프롬프트 복사": "プロンプトコピー",
+  "내 주간 코드 복사": "自分の週間コードをコピー",
   "복사": "コピー",
   "테마": "テーマ",
   "데이터 안정성": "データ安定性",
@@ -320,6 +323,7 @@ const state = {
   aiPromptType: "weekly",
   printItems: ["planner", "dashboard", "daily"],
   searchOpen: false,
+  friendPlan: null,
   toast: ""
 };
 
@@ -567,6 +571,55 @@ function weekEvents() {
   const end = addDays(start, 6);
   return memory.events.filter((event) => event.date >= start && event.date <= end);
 }
+function encodeSharePayload(payload) {
+  return btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+}
+function decodeSharePayload(code) {
+  const raw = String(code || "").trim();
+  if (!raw) throw new Error("empty");
+  const payload = JSON.parse(decodeURIComponent(escape(atob(raw))));
+  if (payload.type !== "planner-week" || !Array.isArray(payload.events)) throw new Error("invalid");
+  return payload;
+}
+function createWeekShareCode() {
+  const start = state.weekStart;
+  const end = addDays(start, 6);
+  const events = weekEvents()
+    .map((event) => ({
+      name: event.name,
+      date: event.date,
+      startTime: event.startTime,
+      endTime: event.endTime,
+      categoryName: category(event.categoryId).name,
+      colorIndex: event.colorIndex,
+      memo: event.memo || "",
+      status: event.status
+    }))
+    .sort((a, b) => `${a.date} ${a.startTime}`.localeCompare(`${b.date} ${b.startTime}`));
+  const goals = memory.goals
+    .filter((goal) => goal.period === "weekly" && goal.startDate <= end && goal.endDate >= start)
+    .map((goal) => {
+      const progress = goalProgress(goal);
+      return {
+        name: goal.name,
+        categoryName: category(goal.categoryId).name,
+        current: progress.current,
+        target: goal.target,
+        unit: goal.unit || "",
+        pct: progress.pct
+      };
+    });
+  return encodeSharePayload({
+    type: "planner-week",
+    version: 1,
+    owner: state.authUser?.email || "친구",
+    weekStart: start,
+    weekEnd: end,
+    createdAt: new Date().toISOString(),
+    events,
+    goals
+  });
+}
 function dayEvents(date = state.selectedDate) {
   return memory.events.filter((event) => event.date === date).sort((a, b) => a.startTime.localeCompare(b.startTime));
 }
@@ -732,6 +785,7 @@ function viewTitle() {
     review: "회고",
     dreams: "꿈 / 비전",
     database: "데이터베이스",
+    friends: "친구 일정",
     print: "출력",
     settings: "환경 설정",
     ai: "AI 에이전트"
@@ -751,6 +805,7 @@ function renderTopActions() {
   if (state.view === "review") return `<button class="primary" data-modal="review">${t("회고 작성")}</button>`;
   if (state.view === "dreams") return `<button class="primary" data-modal="dream">${t("비전 추가")}</button>`;
   if (state.view === "database") return `<button class="primary" data-modal="template">${t("일정사전 추가")}</button><button class="soft" data-modal="category">${t("카테고리")}</button>`;
+  if (state.view === "friends") return `<button class="primary" data-action="copyShareCode">${t("내 주간 코드 복사")}</button>`;
   if (state.view === "print") return `<button class="primary" data-action="printSelected">${t("선택 항목 출력")}</button>`;
   if (state.view === "settings") return `<button class="primary" data-action="exportBackup">${t("백업 내보내기")}</button><button class="soft" data-action="importBackup">${t("백업 가져오기")}</button><button class="soft" data-action="checkSupabase">${t("연결 확인")}</button><input class="backupInput" type="file" accept="application/json,.json" hidden>`;
   if (state.view === "ai") return `<button class="primary" data-action="copyPrompt">${t("프롬프트 복사")}</button>`;
@@ -805,7 +860,7 @@ function searchResultRow(result) {
 }
 
 function viewColorIndex(view) {
-  const order = ["today", "planner", "monthly", "dashboard", "daily", "tasks", "habits", "goals", "projects", "notes", "review", "dreams", "database", "settings", "ai"];
+  const order = ["today", "planner", "monthly", "dashboard", "daily", "tasks", "habits", "goals", "projects", "notes", "review", "dreams", "database", "friends", "settings", "ai"];
   return Math.max(0, order.indexOf(view)) % themes[state.theme].colors.length;
 }
 
@@ -885,6 +940,7 @@ function renderView() {
   if (state.view === "review") return renderReview();
   if (state.view === "dreams") return renderDreams();
   if (state.view === "database") return renderDatabase();
+  if (state.view === "friends") return renderFriends();
   if (state.view === "print") return renderPrint();
   if (state.view === "settings") return renderSettings();
   if (state.view === "ai") return renderAI();
@@ -1023,7 +1079,7 @@ function renderPlanner() {
 }
 
 function renderDashboard() {
-  const events = queryFiltered(weekEvents());
+  const events = weekEvents();
   const total = events.reduce((sum, event) => sum + duration(event.startTime, event.endTime), 0);
   const done = events.filter((event) => event.status === "completed").length;
   const goals = memory.goals.filter((goal) => goal.period === "weekly" && goal.startDate === state.weekStart);
@@ -1055,7 +1111,45 @@ function renderDashboard() {
   `;
 }
 
-function renderWeeklyTimeline(events) {
+function renderFriends() {
+  const plan = state.friendPlan;
+  return `<div class="friendGrid">
+    <section class="card">
+      <div class="cardHead"><h3>친구 일정 확인</h3><button data-action="loadFriendCode">확인</button></div>
+      <p class="muted">친구가 보낸 주간 공유 코드를 붙여 넣으면 그 주의 일정만 조회합니다. 이 코드는 내 DB에 저장되지 않습니다.</p>
+      <textarea id="friendCode" class="shareCodeInput" placeholder="친구 주간 코드 붙여넣기"></textarea>
+      <div class="inlineActions">
+        <button class="primary" data-action="loadFriendCode">친구 일정 보기</button>
+        <button class="soft" data-action="copyShareCode">내 주간 코드 복사</button>
+        <button class="ghost" data-action="clearFriendPlan">비우기</button>
+      </div>
+    </section>
+    <section class="card wide2">
+      <div class="cardHead"><h3>${plan ? `${escapeHtml(plan.owner || "친구")} 주간계획` : "친구 주간계획"}</h3><span>${plan ? `${fmtMD(plan.weekStart)} - ${fmtMD(plan.weekEnd)}` : "코드를 입력하세요"}</span></div>
+      ${plan ? renderFriendTimeline(plan) : empty("친구 주간 코드를 붙여 넣으면 이곳에 일정이 표시됩니다.")}
+    </section>
+    <section class="card wide">
+      <div class="cardHead"><h3>친구 목표</h3><span>공유 코드 기준</span></div>
+      <div class="goalBars">${plan?.goals?.length ? plan.goals.map((goal) => `<div class="goalBar" style="--goal:${goal.pct || 0}%"><div><b>${escapeHtml(goal.name)}</b><span>${goal.current || 0}/${goal.target || 1}${escapeHtml(goal.unit || "")}</span></div><p><i style="width:${goal.pct || 0}%"></i></p><em>${goal.pct || 0}%</em></div>`).join("") : empty("공유된 목표가 없습니다.")}</div>
+    </section>
+  </div>`;
+}
+
+function renderFriendTimeline(plan) {
+  const currentWeek = state.weekStart;
+  state.weekStart = plan.weekStart;
+  const events = plan.events.map((event, index) => ({
+    ...event,
+    id: `friend_${index}`,
+    categoryId: "",
+    colorIndex: Number(event.colorIndex || index)
+  }));
+  const html = renderWeeklyTimeline(events, { readonly: true });
+  state.weekStart = currentWeek;
+  return html;
+}
+
+function renderWeeklyTimeline(events, options = {}) {
   const dates = weekDates();
   const days = ["월", "화", "수", "목", "금", "토", "일"];
   const startMinute = 7 * 60;
@@ -1066,7 +1160,7 @@ function renderWeeklyTimeline(events) {
     const span = index === hours.length - 1 && slots % 2 ? 1 : 2;
     return `<div class="timelineHour" style="grid-column: span ${span}">${pad(hour)}:00</div>`;
   }).join("");
-  return `<div class="weekTimeline" style="grid-template-columns: 48px repeat(${slots}, minmax(20px, 1fr)); --slots:${slots}">
+  return `<div class="weekTimeline" style="grid-template-columns: 42px repeat(${slots}, minmax(18px, 1fr)); --slots:${slots}">
     <div class="timelineCorner"></div>${hourLabels}
     ${dates.map((date, index) => {
       const dayEventsValue = events.filter((event) => event.date === date);
@@ -1081,7 +1175,7 @@ function renderWeeklyTimeline(events) {
             if (clippedEnd <= startMinute || clippedStart >= endMinute) return "";
             const left = ((clippedStart - startMinute) / (endMinute - startMinute)) * 100;
             const width = Math.max(2.4, ((clippedEnd - clippedStart) / (endMinute - startMinute)) * 100);
-            return `<button class="timelineEvent" style="--event:${color(event.colorIndex)}; left:${left}%; width:${width}%" data-event="${event.id}">
+            return `<button class="timelineEvent" style="--event:${color(event.colorIndex)}; left:${left}%; width:${width}%" ${options.readonly ? "" : `data-event="${event.id}"`}>
               <b>${escapeHtml(event.name)}</b><span>${event.startTime}-${event.endTime}</span>
             </button>`;
           }).join("")}
@@ -1411,9 +1505,9 @@ function openPrintDocument(items = state.printItems) {
   win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${label}</title><link rel="stylesheet" href="src/styles.css"><style>
     body{background:#fff;padding:0;color:#111;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
     .printDoc{display:grid;gap:22px}
-    .printPage{break-after:page;width:190mm;height:277mm;padding:8mm;box-sizing:border-box;overflow:hidden;position:relative;background:#fff}
+    .printPage{break-after:page;width:190mm;height:277mm;padding:8mm;box-sizing:border-box;overflow:hidden;position:relative;background:#fff;display:grid;align-content:center;justify-items:center}
     .printPage h1{margin:0 0 10px;font-size:20px}
-    .printBody{width:100%;height:calc(100% - 36px);overflow:hidden}
+    .printBody{width:100%;height:calc(100% - 36px);overflow:hidden;display:grid;align-content:center}
     .printPage.dashboardPrint .printBody{position:absolute;left:8mm;top:8mm;width:174mm;height:261mm}
     .printPage.dashboardPrint .rotateWrap{position:absolute;left:174mm;top:0;width:261mm;height:174mm;transform:rotate(90deg);transform-origin:top left;overflow:hidden}
     .printPage.dashboardPrint h1{position:absolute;left:8mm;top:8mm;z-index:2;background:#fff;padding-right:8px}
@@ -1422,6 +1516,12 @@ function openPrintDocument(items = state.printItems) {
     button{display:block!important}
     .main{display:block!important;border:0!important;box-shadow:none!important;background:#fff!important}
     .plannerGrid,.monthlyGrid,.dailyBoard,.weekTimeline{min-width:0!important;width:100%!important;overflow:hidden!important}
+    .dashboardGrid{display:block!important}
+    .printDashboardOnly{width:100%;display:grid;place-items:center}
+    .printDailyOnly{width:100%;display:grid;gap:10px}
+    .printDailyTitle{text-align:center;font-size:20px;font-weight:950;margin-bottom:8px}
+    .printDailyOnly .dailyWrap{grid-template-columns:1fr!important}
+    .printDailyOnly .dayPicker{display:none!important}
     .card,.heroCard,.metric,.lane,.goalCard,.projectCard,.dreamCard{box-shadow:none!important;break-inside:avoid}
     @page{size:A4 portrait;margin:0}
   </style></head><body><main class="printDoc">${sections.map((section) => `<section class="printPage ${section.id === "dashboard" ? "dashboardPrint" : ""}"><h1>${section.title}</h1><div class="printBody">${section.id === "dashboard" ? `<div class="rotateWrap">${section.html}</div>` : section.html}</div></section>`).join("")}</main><script>setTimeout(()=>window.print(),350)</script></body></html>`);
@@ -1433,8 +1533,7 @@ function printSections(items = state.printItems) {
   const renderers = {
     today: renderToday,
     planner: renderPlanner,
-    dashboard: renderDashboard,
-    daily: renderDaily,
+    dashboard: renderDashboardPrint,
     monthly: renderMonthly,
     tasks: renderTasks,
     habits: renderHabits,
@@ -1445,7 +1544,23 @@ function printSections(items = state.printItems) {
     dreams: renderDreams,
     database: renderDatabase
   };
-  return items.filter((id) => renderers[id]).map((id) => ({ id, title: titles[id] || id, html: renderers[id]() }));
+  return items.filter((id) => renderers[id] || id === "daily").flatMap((id) => {
+    if (id === "daily") {
+      const currentDate = state.selectedDate;
+      return weekDates().map((date, index) => {
+        state.selectedDate = date;
+        const title = `${fmtMD(date)} ${["월", "화", "수", "목", "금", "토", "일"][index]}요일 일정 대시보드`;
+        const html = `<div class="printDailyOnly"><div class="printDailyTitle">${title}</div>${renderDaily()}</div>`;
+        state.selectedDate = currentDate;
+        return { id: "daily", title, html };
+      });
+    }
+    return [{ id, title: titles[id] || id, html: renderers[id]() }];
+  });
+}
+
+function renderDashboardPrint() {
+  return `<div class="printDashboardOnly">${renderWeeklyTimeline(weekEvents(), { readonly: true })}</div>`;
 }
 
 function eventRow(event) {
@@ -1969,6 +2084,13 @@ document.addEventListener("click", async (event) => {
     event.stopPropagation();
     return;
   }
+  if (state.searchOpen && !event.target.closest(".topSearch, .searchOverlay")) {
+    state.searchOpen = false;
+    if (!event.target.closest("button, [data-view], [data-event], [data-goal], [data-task], [data-project]")) {
+      render();
+      return;
+    }
+  }
   if (event.target.dataset.close) {
     state.modal = null;
     state.modalData = null;
@@ -2261,6 +2383,25 @@ document.addEventListener("click", async (event) => {
   }
   if (target.dataset.action === "printSelected") {
     openPrintDocument(state.printItems);
+    return;
+  }
+  if (target.dataset.action === "copyShareCode") {
+    await navigator.clipboard.writeText(createWeekShareCode());
+    await refresh("이번 주 공유 코드를 복사했습니다.");
+    return;
+  }
+  if (target.dataset.action === "loadFriendCode") {
+    try {
+      state.friendPlan = decodeSharePayload($("#friendCode")?.value || "");
+      render();
+    } catch (error) {
+      showToast("친구 주간 코드를 읽지 못했습니다.");
+    }
+    return;
+  }
+  if (target.dataset.action === "clearFriendPlan") {
+    state.friendPlan = null;
+    render();
     return;
   }
   if (target.dataset.printPreset) {
