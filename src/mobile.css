@@ -506,8 +506,8 @@ html, body, * { scrollbar-width: none; }
   height: 100%;
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  grid-auto-rows: minmax(30px, auto);
-  gap: 5px;
+  grid-template-rows: 18px repeat(6, minmax(0, 1fr));
+  gap: 4px;
   overflow: hidden;
 }
 .monthDow {
@@ -517,14 +517,15 @@ html, body, * { scrollbar-width: none; }
   font-size: 11px;
 }
 .monthDay {
-  min-height: 66px;
+  min-height: 0;
   display: grid;
   align-content: start;
-  gap: 5px;
-  padding: 6px 5px;
+  gap: 3px;
+  padding: 4px;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 12px;
   background: color-mix(in srgb, var(--card) 88%, transparent);
+  overflow: hidden;
   text-align: left;
 }
 .monthDay.today {
@@ -543,8 +544,8 @@ html, body, * { scrollbar-width: none; }
   gap: 3px;
 }
 .monthDay i {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 999px;
 }
 .monthDay i.important {

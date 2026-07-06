@@ -213,6 +213,8 @@ const state = {
   showTutorial: false,
   tutorialStep: 0,
   suppressClickUntil: 0,
+  remoteBootstrapped: false,
+  lastEventOpen: { id: "", at: 0 },
   toast: ""
 };
 
@@ -306,10 +308,10 @@ async function seed() {
 
 async function ensureDefaultCategories() {
   const existing = await all("categories");
-  const activeNames = new Set(existing.filter((cat) => cat.isActive !== false).map((cat) => String(cat.name || "").trim()));
+  const activeNames = new Set(existing.filter((cat) => cat.isActive !== false).map((cat) => String(cat.name || "").trim().toLowerCase()));
   const now = new Date().toISOString();
   const missing = ["공부", "운동", "독서", "프로젝트", "생활", "휴식"]
-    .filter((name) => !activeNames.has(name))
+    .filter((name) => !activeNames.has(name.toLowerCase()))
     .map((name, index) => ({
       id: uid("cat"),
       name,
@@ -322,12 +324,26 @@ async function ensureDefaultCategories() {
 }
 
 async function cleanupDuplicateSeedData() {
+  await ensureDefaultCategories();
   await cleanupDuplicateCategories();
   await cleanupDuplicateRecords("schedule_templates", (item) => String(item.name || "").trim().toLowerCase());
   await cleanupDuplicateRecords("schedule_events", (item) => [item.name, item.date, item.startTime, item.endTime].map((x) => String(x || "").trim().toLowerCase()).join("|"));
   await cleanupDuplicateRecords("goals", (item) => [item.name, item.period, item.startDate, item.endDate].map((x) => String(x || "").trim().toLowerCase()).join("|"));
   await cleanupDuplicateRecords("tasks", (item) => [item.name, item.dueDate, item.projectId || ""].map((x) => String(x || "").trim().toLowerCase()).join("|"));
   await cleanupDuplicateRecords("habits", (item) => String(item.name || "").trim().toLowerCase());
+}
+
+async function syncRemoteAndCleanup() {
+  if (!state.authUser || state.remoteBootstrapped) return;
+  state.remoteBootstrapped = true;
+  try {
+    await pullAllFromSupabase();
+    await seed();
+    await cleanupDuplicateSeedData();
+    await flushSyncQueue();
+  } catch (error) {
+    console.warn("Initial Supabase cleanup skipped:", error);
+  }
 }
 
 async function cleanupDuplicateCategories() {
@@ -544,6 +560,7 @@ function habitDone(habitId, date = today()) {
 function appShell() {
   if (isSupabaseConfigured() && isSupabaseReady() && navigator.onLine && state.authReady && !state.authUser) return loginShell();
   const theme = themes[state.theme];
+  const actions = renderActions();
   return `
     <aside class="sidebar">
       <div class="brand">
@@ -561,7 +578,7 @@ function appShell() {
       </div>
       ${state.authUser ? `<div class="sidebarCard"><span>로그인</span><strong>${escapeHtml(state.authUser.email || "Google 사용자")}</strong><button class="ghost full" data-action="signOut">로그아웃</button></div>` : ""}
     </aside>
-    <main class="main">
+    <main class="main ${actions ? "" : "noActions"}">
       <header class="topbar">
         <div>
           <p class="eyebrow">${theme.label}</p>
@@ -569,7 +586,7 @@ function appShell() {
         </div>
         <div class="topActions"><input class="globalSearch" value="${escapeAttr(state.query)}" placeholder="검색">${renderTopActions()}</div>
       </header>
-      <section class="actionPanel">${renderActions()}</section>
+      ${actions ? `<section class="actionPanel">${actions}</section>` : ""}
       <section class="content">${renderView()}</section>
     </main>
     ${renderModal()}
@@ -659,15 +676,13 @@ function renderTopActions() {
 }
 
 function renderActions() {
-  const cats = [`<button class="pill ${state.selectedCategory === "all" ? "active" : ""}" data-filter-cat="all">전체</button>`]
-    .concat(memory.categories.map((cat) => `<button class="pill ${state.selectedCategory === cat.id ? "active" : ""}" data-filter-cat="${cat.id}">${cat.name}</button>`));
   if (state.view === "database") return [
     ["events", "일정 기록"],
     ["templates", "자주 쓰는 일정"],
     ["categories", "분류"],
     ["repeats", "반복 일정"]
   ].map(([id, label]) => `<button class="pill ${state.dataTab === id ? "active" : ""}" data-data-tab="${id}">${label}</button>`).join("");
-  if (["planner", "monthly", "dashboard", "daily", "tasks", "goals"].includes(state.view)) return cats.join("");
+  if (["planner", "monthly", "dashboard", "daily", "tasks"].includes(state.view)) return categoryPills();
   if (state.view === "habits") return `<span class="panelHint">습관 칸을 누르면 해당 날짜의 체크 상태가 바뀝니다.</span>`;
   if (state.view === "projects") return `<span class="panelHint">프로젝트는 다음 행동 완료율로 진행률을 계산합니다.</span>`;
   if (state.view === "notes") return `<span class="panelHint">계획 원칙, AI 질문, 장기 아이디어를 한 곳에 보관합니다.</span>`;
@@ -676,6 +691,22 @@ function renderActions() {
   if (state.view === "settings") return `<span class="panelHint">테마, 백업, 오프라인 저장 상태를 관리합니다.</span>`;
   if (state.view === "ai") return `<button class="primary" data-ai="weekly">주간 피드백</button><button class="soft" data-ai="goal">목표 추천</button><button class="soft" data-ai="habit">습관 분석</button><button class="soft" data-ai="review">회고 요약</button>`;
   return "";
+}
+
+function categoryPills() {
+  return [`<button class="pill ${state.selectedCategory === "all" ? "active" : ""}" data-filter-cat="all">전체</button>`]
+    .concat(uniqueCategories().map((cat) => `<button class="pill ${state.selectedCategory === cat.id ? "active" : ""}" data-filter-cat="${cat.id}">${cat.name}</button>`))
+    .join("");
+}
+
+function uniqueCategories() {
+  const seen = new Set();
+  return memory.categories.filter((cat) => {
+    const key = String(cat.name || "").trim().toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function filtered(items) {
@@ -885,7 +916,7 @@ function renderHabits() {
 
 function renderGoals() {
   const goals = filtered(memory.goals);
-  return `<div class="goalBoard">${goals.map((goal) => `
+  return `<div class="categoryStrip">${categoryPills()}</div><div class="goalBoard">${goals.map((goal) => `
     <article class="goalCard" data-goal="${goal.id}">
       <div class="goalTop"><span>${goal.period}</span><b>${goal.status}</b></div>
       <h3>${goal.name}</h3>
@@ -1309,6 +1340,13 @@ function render(focusSearch = false) {
 }
 
 function openEventModal(data = {}) {
+  if (data.id) {
+    const now = Date.now();
+    if (state.lastEventOpen.id === data.id && now - state.lastEventOpen.at < 450) return;
+    state.lastEventOpen = { id: data.id, at: now };
+  } else {
+    state.lastEventOpen = { id: "", at: 0 };
+  }
   state.modal = "event";
   state.modalData = data;
   state.selectedDate = data.date || state.selectedDate;
@@ -1931,11 +1969,15 @@ async function boot() {
     state.authUser = user;
     state.authReady = true;
     if (user) {
+      state.remoteBootstrapped = false;
+      await syncRemoteAndCleanup();
       await flushSyncQueue();
       state.syncStatus = await dbHealthCheck();
+      await load();
     }
     render();
   });
+  if (state.authUser) await syncRemoteAndCleanup();
   await seed();
   await cleanupDuplicateSeedData();
   if (state.authUser) await flushSyncQueue();

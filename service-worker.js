@@ -1,10 +1,10 @@
-const CACHE_NAME = "life-planner-mobile-v1";
+const CACHE_NAME = "life-planner-mobile-v20260706-2";
 const APP_SHELL = [
   "/mobile.html",
-  "/src/mobile.css",
-  "/src/mobile.js",
-  "/src/db.js",
-  "/src/supabase.js",
+  "/src/mobile.css?v=20260706-2",
+  "/src/mobile.js?v=20260706-2",
+  "/src/db.js?v=20260706-2",
+  "/src/supabase.js?v=20260706-2",
   "/manifest.webmanifest",
   "/assets/icon.svg"
 ];
@@ -23,12 +23,15 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin) return;
+
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request).then((response) => {
+    fetch(event.request).then((response) => {
       const copy = response.clone();
       caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
       return response;
-    }).catch(() => caches.match("/mobile.html")))
+    }).catch(() => caches.match(event.request).then((cached) => cached || caches.match("/mobile.html")))
   );
 });
 

@@ -133,6 +133,9 @@ nav {
   box-shadow: var(--shadow);
   overflow: hidden;
 }
+.main.noActions {
+  grid-template-rows: 70px minmax(0, 1fr);
+}
 .topbar, .actionPanel {
   display: flex;
   align-items: center;
@@ -311,9 +314,8 @@ nav {
   color: var(--text);
 }
 [data-theme="dark"] .toast {
-  border-color: color-mix(in srgb, var(--accent) 46%, var(--line));
-  background: color-mix(in srgb, var(--card) 70%, var(--accent) 16%);
-  color: var(--text);
+  background: color-mix(in srgb, var(--text) 92%, var(--accent));
+  color: #050505;
 }
 [data-theme="dark"] .scoreRing {
   border-color: color-mix(in srgb, var(--accent) 26%, var(--line));
@@ -337,10 +339,17 @@ nav {
   min-height: 0;
   height: 100%;
   overflow: auto;
-  padding: 16px 16px 34px;
+  padding: 16px 16px 96px;
+  scroll-padding-bottom: 96px;
   scroll-behavior: smooth;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+}
+.categoryStrip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
 }
 .card, .heroCard, .metric, .lane, .goalCard, .projectCard, .dreamCard {
   border: 1px solid color-mix(in srgb, var(--line) 86%, transparent);
@@ -1061,18 +1070,16 @@ td button {
 .reviewSummary em { color: var(--accent); font-style: normal; font-weight: 900; }
 .toast {
   position: fixed;
-  left: 50%;
-  top: 18px;
+  right: 28px;
+  bottom: 28px;
   z-index: 40;
   padding: 12px 16px;
   border-radius: 15px;
-  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line));
-  background: color-mix(in srgb, var(--card) 84%, var(--accent) 16%);
-  color: var(--text);
+  background: var(--text);
+  color: var(--card);
   font-weight: 900;
   box-shadow: var(--shadow);
-  pointer-events: none;
-  animation: toastIn 3.2s cubic-bezier(.2, .8, .2, 1) both;
+  animation: toastIn .24s ease;
 }
 .empty {
   min-height: 62px;
@@ -1096,10 +1103,8 @@ td button {
   to { opacity: 1; }
 }
 @keyframes toastIn {
-  0% { opacity: 0; transform: translate(-50%, -16px) scale(.98); }
-  12% { opacity: 1; transform: translate(-50%, 0) scale(1); }
-  84% { opacity: 1; transform: translate(-50%, 0) scale(1); }
-  100% { opacity: 0; transform: translate(-50%, -14px) scale(.985); }
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @media (max-width: 1180px) {
@@ -1149,6 +1154,9 @@ td button {
     border-radius: 24px;
     grid-template-rows: auto auto minmax(0, 1fr);
   }
+  .main.noActions {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
   .topbar {
     align-items: flex-start;
     padding-top: 12px;
@@ -1169,7 +1177,8 @@ td button {
   .content {
     min-height: 0;
     max-height: none;
-    padding: 12px 12px 30px;
+    padding: 12px 12px 88px;
+    scroll-padding-bottom: 88px;
     overflow: auto;
   }
   .todayGrid, .dashboardGrid, .reviewGrid, .goalBoard, .projectGrid, .dreamBoard, .settingsGrid, .notesGrid, .aiGrid { grid-template-columns: 1fr; }
