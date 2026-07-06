@@ -50,12 +50,12 @@ button:hover { transform: translateY(-1px); }
 button:active { transform: translateY(0) scale(.985); }
 #app {
   display: grid;
-  grid-template-columns: 210px 1fr;
-  gap: 16px;
+  grid-template-columns: 188px 1fr;
+  gap: 12px;
   width: 100vw;
   height: 100dvh;
   min-height: 0;
-  padding: 14px;
+  padding: 12px;
 }
 #app:has(.loginShell) {
   display: block;
@@ -65,14 +65,14 @@ button:active { transform: translateY(0) scale(.985); }
   display: flex;
   flex-direction: column;
   min-width: 0;
-  padding: 16px;
+  padding: 14px;
   border: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
-  border-radius: 26px;
+  border-radius: 22px;
   background: color-mix(in srgb, var(--card) 82%, transparent);
   box-shadow: var(--shadow);
   backdrop-filter: blur(22px);
 }
-.brand { display: flex; align-items: center; gap: 11px; margin-bottom: 18px; }
+.brand { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .brandMark {
   width: 36px;
   height: 36px;
@@ -80,9 +80,9 @@ button:active { transform: translateY(0) scale(.985); }
   background: linear-gradient(135deg, var(--accent), var(--accent2));
   box-shadow: 0 12px 24px color-mix(in srgb, var(--accent) 34%, transparent);
 }
-.brand h1 { margin: 0; font-size: 18px; letter-spacing: -.02em; }
+.brand h1 { margin: 0; font-size: 16px; letter-spacing: -.02em; }
 .brand p { margin: 1px 0 0; color: var(--muted); font-size: 11px; }
-nav { display: grid; gap: 6px; }
+nav { display: grid; gap: 4px; }
 nav {
   min-height: 0;
   overflow-y: auto;
@@ -90,9 +90,9 @@ nav {
   padding-right: 2px;
 }
 .navItem {
-  height: 35px;
-  padding: 0 12px;
-  border-radius: 12px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 10px;
   background: transparent;
   color: var(--muted);
   text-align: left;
@@ -112,13 +112,14 @@ nav {
 }
 .sidebarCard {
   margin-top: auto;
-  padding: 14px;
+  padding: 11px;
   border: 1px solid var(--line);
   border-radius: 18px;
   background: var(--soft);
 }
 .sidebarCard span, .eyebrow { display: block; color: var(--muted); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
-.sidebarCard strong { display: block; margin-top: 5px; font-size: 16px; }
+.sidebarCard strong { display: block; margin-top: 5px; font-size: 14px; overflow-wrap: anywhere; }
+.sidebarCard:has([data-action="signOut"]) { display: none; }
 .swatches { display: flex; gap: 6px; margin-top: 12px; }
 .swatches i { width: 18px; height: 18px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, .45); }
 .main {
@@ -128,7 +129,7 @@ nav {
   display: grid;
   grid-template-rows: 70px auto minmax(0, 1fr);
   border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
-  border-radius: 30px;
+  border-radius: 24px;
   background: color-mix(in srgb, var(--shell) 86%, transparent);
   box-shadow: var(--shadow);
   overflow: hidden;
@@ -141,18 +142,18 @@ nav {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 0 18px;
+  padding: 0 14px;
 }
 .topbar {
   border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
   background: color-mix(in srgb, var(--card) 84%, transparent);
   backdrop-filter: blur(18px);
 }
-.topbar h2 { margin: 1px 0 0; font-size: 22px; letter-spacing: -.04em; }
+.topbar h2 { margin: 1px 0 0; font-size: 19px; letter-spacing: -.04em; }
 .topActions, .actionPanel { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-start; }
 .globalSearch {
-  width: 180px;
-  min-height: 32px;
+  width: 170px;
+  min-height: 30px;
   padding: 0 12px;
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -165,8 +166,8 @@ nav {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 13%, transparent);
 }
 .actionPanel {
-  min-height: 50px;
-  max-height: 96px;
+  min-height: 42px;
+  max-height: 76px;
   overflow-x: auto;
   overflow-y: hidden;
   flex-wrap: nowrap;
@@ -179,9 +180,9 @@ nav {
   font-weight: 800;
 }
 .primary, .soft, .ghost, .pill, .cardHead button, .miniActions button, .aiChoice {
-  min-height: 32px;
-  padding: 0 13px;
-  border-radius: 12px;
+  min-height: 30px;
+  padding: 0 11px;
+  border-radius: 11px;
   font-weight: 800;
   white-space: nowrap;
 }
@@ -339,8 +340,8 @@ nav {
   min-height: 0;
   height: 100%;
   overflow: auto;
-  padding: 16px 16px 96px;
-  scroll-padding-bottom: 96px;
+  padding: 14px 14px 86px;
+  scroll-padding-bottom: 86px;
   scroll-behavior: smooth;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
@@ -350,6 +351,27 @@ nav {
   flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 14px;
+}
+.filterSelect {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--card) 82%, transparent);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+}
+.filterSelect select {
+  max-width: 130px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-weight: 900;
 }
 .card, .heroCard, .metric, .lane, .goalCard, .projectCard, .dreamCard {
   border: 1px solid color-mix(in srgb, var(--line) 86%, transparent);
@@ -362,14 +384,14 @@ nav {
 .card:hover, .metric:hover, .lane:hover, .goalCard:hover, .projectCard:hover, .dreamCard:hover {
   transform: translateY(-1px);
 }
-.card, .heroCard { padding: 16px; }
+.card, .heroCard { padding: 14px; }
 .cardHead { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
 .cardHead h3, .card h3, .lane h3, .goalCard h3, .projectCard h3, .dreamCard h3 { margin: 0; font-size: 15px; letter-spacing: -.02em; }
 .cardHead span, .muted, small { color: var(--muted); }
 .todayGrid, .dashboardGrid, .reviewGrid {
   display: grid;
   grid-template-columns: 1.08fr 1fr 1fr;
-  gap: 14px;
+  gap: 12px;
 }
 .wide { grid-column: span 2; }
 .wide2 { grid-column: span 3; }
@@ -458,7 +480,7 @@ nav {
 .goalBar b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .goalBar span, .goalBar em { color: var(--muted); font-size: 11px; font-style: normal; }
 .goalBar p, .bar {
-  height: 9px;
+  height: 10px;
   margin: 0;
   border-radius: 99px;
   background: color-mix(in srgb, var(--line) 70%, transparent);
@@ -469,6 +491,8 @@ nav {
   height: 100%;
   border-radius: inherit;
   background: linear-gradient(90deg, var(--accent), var(--accent2));
+  transition: width .75s cubic-bezier(.16, 1, .3, 1);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 .plannerGrid {
   display: grid;
@@ -577,11 +601,28 @@ nav {
   color: var(--accent);
   font-weight: 900;
 }
-.slot.selecting {
-  background: color-mix(in srgb, var(--accent2) 22%, var(--card));
-  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent2) 58%, transparent);
+.slot.selecting,
+.slot.dropTarget {
+  background: color-mix(in srgb, var(--accent2) 18%, var(--card));
+  border-left: 4px solid var(--accent2);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent2) 58%, transparent);
 }
-.slot.dropTarget,
+.slot.dropTarget {
+  background: color-mix(in srgb, var(--accent) 18%, var(--card)) !important;
+  border-left-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.slot.selectStart,
+.slot.dropStart { border-radius: 12px 12px 0 0; }
+.slot.selectMiddle,
+.slot.dropMiddle {
+  border-top-color: transparent;
+  border-bottom-color: transparent;
+}
+.slot.selectEnd,
+.slot.dropEnd { border-radius: 0 0 12px 12px; }
+.slot.selectStart.selectEnd,
+.slot.dropStart.dropEnd { border-radius: 12px; }
 .monthSlot.dropTarget {
   background: color-mix(in srgb, var(--accent) 26%, var(--card)) !important;
   box-shadow: inset 0 0 0 2px var(--accent), 0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent);
@@ -593,7 +634,7 @@ nav {
   min-height: 24px;
   padding: 3px 7px;
   border-left: 4px solid var(--event);
-  border-radius: 10px;
+  border-radius: 11px;
   background: color-mix(in srgb, var(--event) 16%, var(--card));
   text-align: left;
   user-select: none;
@@ -793,6 +834,51 @@ td button {
 .categoryList button { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 10px; border-radius: 12px; background: var(--soft); font-weight: 800; }
 .categoryList i { width: 12px; height: 12px; border-radius: 50%; }
 .aiGrid { grid-template-columns: 260px 1fr; }
+.aiPage {
+  display: grid;
+  grid-template-columns: minmax(260px, .8fr) minmax(420px, 1.2fr);
+  gap: 14px;
+  align-items: start;
+}
+.aiHero {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 6px;
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--line) 86%, transparent);
+  border-radius: 20px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 14%, var(--card)), color-mix(in srgb, var(--accent2) 12%, var(--soft)));
+}
+.aiHero h3 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: -.04em;
+}
+.aiHero p { margin: 0; color: var(--muted); font-weight: 800; }
+.aiChoiceGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.aiPromptCard {
+  min-height: 88px;
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--card) 88%, transparent);
+  text-align: left;
+}
+.aiPromptCard b { font-size: 14px; }
+.aiPromptCard span { color: var(--muted); font-size: 12px; font-weight: 750; line-height: 1.45; }
+.aiPromptCard.active {
+  border-color: color-mix(in srgb, var(--accent) 68%, var(--line));
+  background: color-mix(in srgb, var(--accent) 15%, var(--card));
+  box-shadow: 0 14px 28px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.aiOutput { min-height: 100%; }
 .settingsGrid { grid-template-columns: 1.2fr .8fr; }
 .themeGrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
 .themeCard {
@@ -929,15 +1015,6 @@ td button {
   justify-content: space-between;
   gap: 10px;
 }
-.tutorialClose {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  width: 34px;
-  height: 34px;
-  border-radius: 12px;
-  background: var(--soft);
-}
 .tutorialDots {
   display: flex;
   gap: 6px;
@@ -955,7 +1032,7 @@ td button {
 .aiChoice { width: 100%; margin-top: 8px; text-align: left; }
 #aiPrompt {
   width: 100%;
-  height: 430px;
+  height: min(58vh, 520px);
   padding: 14px;
   resize: none;
   border: 1px solid var(--line);
@@ -1108,9 +1185,10 @@ td button {
 }
 
 @media (max-width: 1180px) {
-  #app { grid-template-columns: 180px 1fr; }
+  #app { grid-template-columns: 160px 1fr; }
   .todayGrid, .dashboardGrid, .reviewGrid, .goalBoard, .projectGrid, .dreamBoard, .dataGrid, .settingsGrid, .notesGrid { grid-template-columns: 1fr 1fr; }
   .aiGrid { grid-template-columns: 220px 1fr; }
+  .aiPage { grid-template-columns: 1fr; }
   .wide, .wide2, .full { grid-column: 1 / -1; }
   .plannerGrid { min-width: 860px; }
   .monthlyGrid { min-width: 860px; }
@@ -1177,11 +1255,12 @@ td button {
   .content {
     min-height: 0;
     max-height: none;
-    padding: 12px 12px 88px;
-    scroll-padding-bottom: 88px;
+    padding: 12px 12px 80px;
+    scroll-padding-bottom: 80px;
     overflow: auto;
   }
   .todayGrid, .dashboardGrid, .reviewGrid, .goalBoard, .projectGrid, .dreamBoard, .settingsGrid, .notesGrid, .aiGrid { grid-template-columns: 1fr; }
+  .aiChoiceGrid { grid-template-columns: 1fr; }
   .kanban { grid-template-columns: repeat(2, minmax(220px, 1fr)); }
   .dataGrid, .dataGrid.single { grid-template-columns: 1fr; }
   .noteList { grid-template-columns: 1fr; }

@@ -212,9 +212,11 @@ const state = {
   authReady: false,
   showTutorial: false,
   tutorialStep: 0,
+  isComposing: false,
   suppressClickUntil: 0,
   remoteBootstrapped: false,
   lastEventOpen: { id: "", at: 0 },
+  aiPromptType: "weekly",
   toast: ""
 };
 
@@ -624,7 +626,6 @@ function renderTutorial() {
   const [title, body] = steps[state.tutorialStep] || steps[0];
   return `<div class="tutorialBackdrop">
     <section class="tutorialCard">
-      <button class="tutorialClose" data-action="finishTutorial">닫기</button>
       <p class="eyebrow">처음 쓰는 사람을 위한 ${state.tutorialStep + 1}/${steps.length}</p>
       <h3>${title}</h3>
       <p>${body}</p>
@@ -644,7 +645,7 @@ function viewTitle() {
     monthly: "월간 계획",
     dashboard: "주간 대시보드",
     daily: "일간 대시보드",
-    tasks: "할 일 인박스",
+    tasks: "To Do List",
     habits: "습관",
     goals: "목표",
     projects: "프로젝트",
@@ -681,15 +682,15 @@ function renderActions() {
     ["templates", "자주 쓰는 일정"],
     ["categories", "분류"],
     ["repeats", "반복 일정"]
-  ].map(([id, label]) => `<button class="pill ${state.dataTab === id ? "active" : ""}" data-data-tab="${id}">${label}</button>`).join("");
-  if (["planner", "monthly", "dashboard", "daily", "tasks"].includes(state.view)) return categoryPills();
+  ].map(([id, label]) => `<button class="pill ${state.dataTab === id ? "active" : ""}" data-data-tab="${id}">${label}</button>`).join("") + (state.dataTab === "categories" ? "" : categorySelect());
+  if (state.view === "tasks") return categoryPills();
   if (state.view === "habits") return `<span class="panelHint">습관 칸을 누르면 해당 날짜의 체크 상태가 바뀝니다.</span>`;
   if (state.view === "projects") return `<span class="panelHint">프로젝트는 다음 행동 완료율로 진행률을 계산합니다.</span>`;
   if (state.view === "notes") return `<span class="panelHint">계획 원칙, AI 질문, 장기 아이디어를 한 곳에 보관합니다.</span>`;
   if (state.view === "review") return `<span class="panelHint">완료 일정, 습관, 할 일을 기준으로 실행 점수를 계산합니다.</span>`;
   if (state.view === "dreams") return `<span class="panelHint">꿈과 비전은 목표보다 긴 기간의 방향성을 기록하는 공간입니다.</span>`;
   if (state.view === "settings") return `<span class="panelHint">테마, 백업, 오프라인 저장 상태를 관리합니다.</span>`;
-  if (state.view === "ai") return `<button class="primary" data-ai="weekly">주간 피드백</button><button class="soft" data-ai="goal">목표 추천</button><button class="soft" data-ai="habit">습관 분석</button><button class="soft" data-ai="review">회고 요약</button>`;
+  if (state.view === "ai") return "";
   return "";
 }
 
@@ -709,11 +710,22 @@ function uniqueCategories() {
   });
 }
 
+function categorySelect() {
+  return `<label class="filterSelect"><span>카테고리</span><select data-filter-cat-select>
+    <option value="all" ${state.selectedCategory === "all" ? "selected" : ""}>전체</option>
+    ${uniqueCategories().map((cat) => `<option value="${cat.id}" ${state.selectedCategory === cat.id ? "selected" : ""}>${cat.name}</option>`).join("")}
+  </select></label>`;
+}
+
 function filtered(items) {
   const byCategory = state.selectedCategory === "all" ? items : items.filter((item) => item.categoryId === state.selectedCategory);
+  return queryFiltered(byCategory);
+}
+
+function queryFiltered(items) {
   const q = state.query.trim().toLowerCase();
-  if (!q) return byCategory;
-  return byCategory.filter((item) => [
+  if (!q) return items;
+  return items.filter((item) => [
     item.name,
     item.title,
     item.body,
@@ -747,7 +759,7 @@ function renderView() {
 function renderMonthly() {
   const dates = monthCalendarDates();
   const days = ["월", "화", "수", "목", "금", "토", "일"];
-  const events = filtered(monthEvents());
+  const events = queryFiltered(monthEvents());
   return `
     <div class="plannerGrid monthlyGrid">
       ${days.map((day) => `<div class="dayHead"><b>${day}</b><span>${monthLabel(state.monthStart)}</span></div>`).join("")}
@@ -814,6 +826,7 @@ function nextFocusItem(events, tasks) {
 function renderPlanner() {
   const dates = weekDates();
   const slots = Array.from({ length: 36 }, (_, i) => ({ hour: 6 + Math.floor(i / 2), minute: i % 2 ? 30 : 0 }));
+  const events = queryFiltered(memory.events);
   return `
     <div class="plannerGrid" style="grid-template-columns: 58px repeat(7, 1fr)">
       <div class="corner"></div>
@@ -822,7 +835,7 @@ function renderPlanner() {
         <div class="timeCell ${minute ? "half" : "hour"}">${minute ? `${pad(hour)}:30` : `${pad(hour)}:00`}</div>
         ${dates.map((date) => {
           const time = slotTime(hour, minute);
-          const inSlot = filtered(memory.events).filter((event) => event.date === date && event.startTime === time);
+          const inSlot = events.filter((event) => event.date === date && event.startTime === time);
           return `<div class="slot ${minute ? "half" : "hour"}" data-date="${date}" data-hour="${hour}" data-minute="${minute}"${slotInlineStyle(inSlot)}>${inSlot.map(eventChip).join("")}</div>`;
         }).join("")}
       `).join("")}
@@ -831,7 +844,7 @@ function renderPlanner() {
 }
 
 function renderDashboard() {
-  const events = filtered(weekEvents());
+  const events = queryFiltered(weekEvents());
   const total = events.reduce((sum, event) => sum + duration(event.startTime, event.endTime), 0);
   const done = events.filter((event) => event.status === "completed").length;
   const goals = memory.goals.filter((goal) => goal.period === "weekly" && goal.startDate === state.weekStart);
@@ -1065,15 +1078,30 @@ function renderSettings() {
 }
 
 function renderAI() {
-  return `<div class="aiGrid">
-    <section class="card">
-      <h3>프롬프트 종류</h3>
-      <button class="aiChoice" data-ai="weekly">이번 주 계획 피드백</button>
-      <button class="aiChoice" data-ai="goal">목표 추천</button>
-      <button class="aiChoice" data-ai="habit">습관 실패 원인 분석</button>
-      <button class="aiChoice" data-ai="review">회고 요약</button>
+  const types = [
+    ["weekly", "주간 계획 피드백", "이번 주 일정의 과밀, 우선순위, 목표 달성 가능성을 점검합니다."],
+    ["overload", "과부하 검사", "하루/시간대별로 무리한 배치와 회복 구간 부족을 찾습니다."],
+    ["goal", "목표 추천", "기존 목표, 일정사전, 완료 기록을 바탕으로 다음 목표 후보를 만듭니다."],
+    ["habit", "습관 실패 원인", "습관 로그와 일정 흐름을 보고 실패 원인을 추정합니다."],
+    ["taskPlan", "할 일 배치 전략", "할 일을 일정으로 옮길 순서와 적정 시간대를 추천합니다."],
+    ["review", "회고 초안", "완료/미완료 데이터를 바탕으로 주간 회고 초안을 만듭니다."],
+    ["monthly", "월간 방향 점검", "이번 달 일정/목표가 장기 방향과 맞는지 점검합니다."],
+    ["dream", "꿈/비전 연결", "비전과 실제 일정 사이의 간극을 줄이는 액션을 제안합니다."]
+  ];
+  return `<div class="aiPage">
+    <section class="aiHero">
+      <p class="eyebrow">Prompt Studio</p>
+      <h3>데이터를 그냥 던지지 않고, 바로 질문 가능한 형태로 정리합니다.</h3>
+      <p>일정, 목표, 습관, 할 일, 프로젝트, 메모를 목적별로 골라서 AI에게 줄 프롬프트를 만듭니다.</p>
     </section>
-    <section class="card wide"><div class="cardHead"><h3>복사용 프롬프트</h3><button data-action="copyPrompt">복사</button></div><textarea id="aiPrompt">${buildPrompt("weekly")}</textarea></section>
+    <section class="aiChoiceGrid">${types.map(([id, title, desc]) => `
+      <button class="aiPromptCard ${state.aiPromptType === id ? "active" : ""}" data-ai="${id}">
+        <b>${title}</b><span>${desc}</span>
+      </button>`).join("")}</section>
+    <section class="card aiOutput">
+      <div class="cardHead"><h3>복사용 프롬프트</h3><button data-action="copyPrompt">복사</button></div>
+      <textarea id="aiPrompt">${buildPrompt(state.aiPromptType)}</textarea>
+    </section>
   </div>`;
 }
 
@@ -1098,7 +1126,7 @@ function habitMini(habit) {
 }
 function goalBar(goal) {
   const progress = goalProgress(goal);
-  return `<div class="goalBar"><div><b>${goal.name}</b><span>${progress.current}/${goal.target}</span></div><p><i style="width:${progress.pct}%"></i></p><em>${progress.pct}%</em></div>`;
+  return `<div class="goalBar" style="--goal:${progress.pct}%"><div><b>${goal.name}</b><span>${progress.current}/${goal.target}</span></div><p><i style="width:${progress.pct}%"></i></p><em>${progress.pct}%</em></div>`;
 }
 function empty(text) {
   return `<div class="empty">${text}</div>`;
@@ -1192,17 +1220,39 @@ function modalBody(type) {
 }
 
 function buildPrompt(type) {
-  const events = weekEvents().map((e) => `- ${e.date} ${e.startTime}-${e.endTime} ${e.name} [${category(e.categoryId).name}] ${e.status}`).join("\n");
+  const week = weekEvents();
+  const doneEvents = week.filter((event) => event.status === "completed");
+  const pendingEvents = week.filter((event) => event.status !== "completed");
+  const events = week.map((e) => `- ${e.date} ${e.startTime}-${e.endTime} ${e.name} [${category(e.categoryId).name}] ${e.status}${e.memo ? ` · ${e.memo}` : ""}`).join("\n");
+  const byDay = weekDates().map((date) => {
+    const day = week.filter((e) => e.date === date);
+    const total = day.reduce((sum, e) => sum + duration(e.startTime, e.endTime), 0);
+    return `- ${date}: ${day.length}개, ${Math.round(total / 60 * 10) / 10}시간`;
+  }).join("\n");
+  const byCategory = uniqueCategories().map((cat) => {
+    const items = week.filter((e) => e.categoryId === cat.id);
+    const total = items.reduce((sum, e) => sum + duration(e.startTime, e.endTime), 0);
+    return `- ${cat.name}: ${items.length}개, ${Math.round(total / 60 * 10) / 10}시간`;
+  }).join("\n");
   const goals = memory.goals.map((g) => {
     const p = goalProgress(g);
-    return `- ${g.name}: ${p.current}/${g.target} (${p.pct}%)`;
+    return `- ${g.name}: ${p.current}/${g.target}${g.unit || ""} (${p.pct}%, ${g.period}, ${category(g.categoryId).name})`;
   }).join("\n");
   const habits = memory.habits.map((h) => `- ${h.name}: 이번 주 ${weekDates().filter((d) => habitDone(h.id, d)).length}/7`).join("\n");
-  const base = `나는 개인 일정/습관/목표를 관리하고 있습니다. 조언은 구체적이고 실행 가능하게 해주세요.\n\n[이번 주 일정]\n${events || "없음"}\n\n[목표]\n${goals || "없음"}\n\n[습관]\n${habits || "없음"}`;
-  if (type === "goal") return `${base}\n\n위 데이터를 바탕으로 이번 주에 세우기 좋은 목표 5개를 추천해주세요. 너무 추상적인 목표 말고, 완료 여부를 판단할 수 있는 목표로 제안해주세요.`;
-  if (type === "habit") return `${base}\n\n습관 달성이 무너지는 원인을 추정하고, 내 일정 흐름에 맞는 개선안을 제시해주세요.`;
-  if (type === "review") return `${base}\n\n이번 주 회고를 작성하려고 합니다. 잘한 점, 병목, 다음 주 개선안으로 정리해주세요.`;
-  return `${base}\n\n이번 주 계획의 현실성, 과밀 시간대, 목표 달성 가능성, 조정해야 할 우선순위를 피드백해주세요.`;
+  const tasks = memory.tasks.map((t) => `- ${t.name}: ${t.status}, 기한 ${t.dueDate || "없음"}, ${t.estimatedMinutes || 60}분, ${category(t.categoryId).name}`).join("\n");
+  const templates = memory.templates.map((t) => `- ${t.name} [${category(t.categoryId).name}] ${t.defaultMemo || ""}`).join("\n");
+  const projects = memory.projects.map((p) => `- ${p.name}: ${p.status}, ${p.area}, ${category(p.categoryId).name}`).join("\n");
+  const notes = memory.notes.slice(-6).map((n) => `- ${n.title}: ${n.body}`).join("\n");
+  const dreams = memory.dreams.map((d) => `- ${d.title}: ${d.area}, ${d.body}`).join("\n");
+  const base = `너는 개인 일정/습관/목표를 분석하는 플래너 코치다. 뻔한 조언 말고, 내 데이터에서 근거를 뽑아 실행 순서까지 제안해라.\n\n[이번 주 요약]\n${byDay}\n\n[카테고리 분포]\n${byCategory || "없음"}\n\n[이번 주 일정 원본]\n${events || "없음"}\n\n[목표]\n${goals || "없음"}\n\n[습관]\n${habits || "없음"}`;
+  if (type === "overload") return `${base}\n\n요청: 과부하 진단을 해라.\n1. 하루별/시간대별로 무리한 구간을 찾아라.\n2. 일정 사이 회복 시간이 부족한 곳을 찾아라.\n3. 미루거나 줄여야 할 일정을 3개까지 골라라.\n4. 바꾼 뒤의 권장 일정 배치를 구체적인 시간으로 제안해라.`;
+  if (type === "goal") return `${base}\n\n[일정사전]\n${templates || "없음"}\n\n요청: 다음 주에 세울 만한 목표를 추천해라.\n1. 내 반복 패턴과 일정사전에서 후보를 뽑아라.\n2. 목표는 횟수/시간/진도 중 무엇으로 측정할지 정해라.\n3. 너무 쉬운 목표, 너무 무리한 목표를 구분해라.\n4. 최종 추천 목표 5개와 그 이유를 써라.`;
+  if (type === "habit") return `${base}\n\n요청: 습관 실패 원인을 찾아라.\n1. 어떤 습관이 일정 구조상 실패하기 쉬운지 분석해라.\n2. 실패 원인을 의지 문제가 아니라 시간/환경/트리거 문제로 설명해라.\n3. 각 습관별로 가장 작은 대체 행동을 제안해라.\n4. 내 일정에 맞는 실행 시간대를 추천해라.`;
+  if (type === "taskPlan") return `${base}\n\n[할 일]\n${tasks || "없음"}\n\n요청: 할 일을 캘린더에 배치하는 전략을 세워라.\n1. 오늘/이번 주 안에 처리해야 할 것을 우선순위로 정렬해라.\n2. 각 할 일에 필요한 집중도와 적정 시간대를 추정해라.\n3. 기존 일정과 충돌하지 않는 배치안을 만들어라.\n4. 버려도 되는 할 일과 반드시 해야 하는 할 일을 나눠라.`;
+  if (type === "review") return `${base}\n\n[완료 일정]\n${doneEvents.map((e) => `- ${e.date} ${e.name}`).join("\n") || "없음"}\n[미완료 일정]\n${pendingEvents.map((e) => `- ${e.date} ${e.name}`).join("\n") || "없음"}\n\n요청: 주간 회고 초안을 만들어라.\n1. 잘한 점 3개, 병목 3개를 데이터 근거와 함께 써라.\n2. 다음 주에 유지할 것/버릴 것/실험할 것을 나눠라.\n3. 회고 문장으로 바로 복사할 수 있게 작성해라.`;
+  if (type === "monthly") return `${base}\n\n[프로젝트]\n${projects || "없음"}\n\n요청: 월간 방향 점검을 해라.\n1. 이번 주 계획이 월간 방향에 도움이 되는지 평가해라.\n2. 비중이 과한 카테고리와 부족한 카테고리를 말해라.\n3. 다음 4주 동안 가져갈 루틴/목표/프로젝트 우선순위를 제안해라.`;
+  if (type === "dream") return `${base}\n\n[꿈/비전]\n${dreams || "없음"}\n[최근 메모]\n${notes || "없음"}\n\n요청: 장기 비전과 이번 주 실행 사이의 간극을 분석해라.\n1. 비전과 연결되는 현재 행동을 찾아라.\n2. 비전과 무관하게 시간을 쓰는 영역을 찾아라.\n3. 이번 주 안에 할 수 있는 작은 액션 5개를 제안해라.`;
+  return `${base}\n\n요청: 이번 주 계획 피드백을 해라.\n1. 현실성, 과밀 시간대, 목표 달성 가능성을 각각 점수화해라.\n2. 일정의 순서가 이상한 부분을 찾아라.\n3. 지금 상태에서 가장 효과가 큰 수정 5개를 제안해라.\n4. 수정 후 예상되는 하루 흐름을 간단히 예시로 보여줘라.`;
 }
 
 async function handleSubmit(event) {
@@ -1359,7 +1409,7 @@ function slotFromPoint(x, y) {
 }
 
 function clearPlannerDragClasses() {
-  $$(".slot.selecting, .slot.dropTarget, .monthSlot.dropTarget").forEach((slot) => slot.classList.remove("selecting", "dropTarget"));
+  $$(".slot.selecting, .slot.selectStart, .slot.selectMiddle, .slot.selectEnd, .slot.dropTarget, .slot.dropStart, .slot.dropMiddle, .slot.dropEnd, .monthSlot.dropTarget").forEach((slot) => slot.classList.remove("selecting", "selectStart", "selectMiddle", "selectEnd", "dropTarget", "dropStart", "dropMiddle", "dropEnd"));
   $$(".eventChip.dragging, .eventPill.dragging").forEach((chip) => chip.classList.remove("dragging"));
 }
 
@@ -1368,15 +1418,38 @@ function paintPlannerSelection() {
   if (!state.drag || state.drag.type !== "select") return;
   const start = Math.min(state.drag.startMinute, state.drag.endMinute);
   const end = Math.max(state.drag.startMinute, state.drag.endMinute);
-  $$(`.slot[data-date="${state.drag.date}"]`).forEach((slot) => {
+  const selected = $$(`.slot[data-date="${state.drag.date}"]`).filter((slot) => {
     const minute = Number(slot.dataset.hour) * 60 + Number(slot.dataset.minute || 0);
-    if (minute >= start && minute <= end) slot.classList.add("selecting");
+    return minute >= start && minute <= end;
+  });
+  selected.forEach((slot, index) => {
+    slot.classList.add("selecting");
+    if (index === 0) slot.classList.add("selectStart");
+    if (index === selected.length - 1) slot.classList.add("selectEnd");
+    if (index > 0 && index < selected.length - 1) slot.classList.add("selectMiddle");
   });
 }
 
 function paintMoveTarget(slot) {
-  $$(".slot.dropTarget, .monthSlot.dropTarget").forEach((item) => item.classList.remove("dropTarget"));
-  if (slot) slot.classList.add("dropTarget");
+  $$(".slot.dropTarget, .slot.dropStart, .slot.dropMiddle, .slot.dropEnd, .monthSlot.dropTarget").forEach((item) => item.classList.remove("dropTarget", "dropStart", "dropMiddle", "dropEnd"));
+  if (!slot) return;
+  if (state.drag?.type === "move") {
+    const eventValue = memory.events.find((item) => item.id === state.drag.eventId);
+    const span = eventValue ? eventSpanSlots(eventValue) : 1;
+    const startMinute = Number(slot.dataset.hour) * 60 + Number(slot.dataset.minute || 0);
+    const targets = $$(`.slot[data-date="${slot.dataset.date}"]`).filter((item) => {
+      const minute = Number(item.dataset.hour) * 60 + Number(item.dataset.minute || 0);
+      return minute >= startMinute && minute < startMinute + span * 30;
+    });
+    targets.forEach((item, index) => {
+      item.classList.add("dropTarget");
+      if (index === 0) item.classList.add("dropStart");
+      if (index === targets.length - 1) item.classList.add("dropEnd");
+      if (index > 0 && index < targets.length - 1) item.classList.add("dropMiddle");
+    });
+    return;
+  }
+  slot.classList.add("dropTarget");
 }
 
 
@@ -1724,7 +1797,8 @@ document.addEventListener("click", async (event) => {
     return;
   }
   if (target.dataset.ai) {
-    $("#aiPrompt").value = buildPrompt(target.dataset.ai);
+    state.aiPromptType = target.dataset.ai;
+    render();
     return;
   }
   if (target.dataset.theme) {
@@ -1811,6 +1885,7 @@ document.addEventListener("click", async (event) => {
 
 document.addEventListener("input", (event) => {
   if (event.target.matches(".globalSearch")) {
+    if (state.isComposing || event.isComposing) return;
     state.query = event.target.value;
     render(true);
     return;
@@ -1831,7 +1906,23 @@ document.addEventListener("input", (event) => {
   }
 });
 
+document.addEventListener("compositionstart", (event) => {
+  if (event.target.matches(".globalSearch")) state.isComposing = true;
+});
+
+document.addEventListener("compositionend", (event) => {
+  if (!event.target.matches(".globalSearch")) return;
+  state.isComposing = false;
+  state.query = event.target.value;
+  render(true);
+});
+
 document.addEventListener("change", (event) => {
+  if (event.target.matches("[data-filter-cat-select]")) {
+    state.selectedCategory = event.target.value;
+    render();
+    return;
+  }
   if (event.target.matches(".backupInput")) {
     importBackupFile(event.target.files?.[0]);
     event.target.value = "";
