@@ -118,7 +118,51 @@ const JA_TEXT = {
   "내용": "内容",
   "저장": "保存",
   "완료": "完了",
-  "체크": "チェック"
+  "체크": "チェック",
+  "오늘, 이번 주, 이번 달을 빠르게 확인하세요.": "今日、今週、今月を素早く確認できます。",
+  "모바일은 일정 확인과 빠른 입력에 집중합니다. 자세한 계획은 데스크탑에서 이어가세요.": "モバイルは予定確認と素早い入力に集中しています。詳しい計画はデスクトップで続けてください。",
+  "Google로 로그인": "Googleでログイン",
+  "전체": "すべて",
+  "목표": "目標",
+  "확인용": "確認用",
+  "진행 목표": "進行中の目標",
+  "오늘 실행할 일을 확인하세요": "今日実行することを確認しましょう",
+  "오늘 일정이 없습니다.": "今日の予定がありません。",
+  "진행 중인 목표가 없습니다.": "進行中の目標がありません。",
+  "최근 메모가 없습니다.": "最近のメモがありません。",
+  "메모가 없습니다.": "メモがありません。",
+  "친구 일정": "友だちの予定",
+  "내 코드": "自分のコード",
+  "친구 주간 코드 붙여넣기": "友だちの週間コードを貼り付け",
+  "친구 일정 보기": "友だちの予定を見る",
+  "친구 주간계획": "友だちの週間計画",
+  "친구 코드를 입력하면 일정이 표시됩니다.": "友だちのコードを入力すると予定が表示されます。",
+  "공유된 일정이 없습니다.": "共有された予定がありません。",
+  "제목": "タイトル",
+  "모바일 설정": "モバイル設定",
+  "모바일 테마는 이 기기에만 저장됩니다. 데스크탑 테마와 동기화하지 않습니다.": "モバイルテーマはこの端末だけに保存されます。デスクトップテーマとは同期しません。",
+  "나중에 데스크탑에서 다시 볼 내용을 적어두세요.": "あとでデスクトップで見返す内容を書いてください。",
+  "종료 시간은 시작 시간보다 늦어야 합니다.": "終了時刻は開始時刻より後にしてください。",
+  "일정을 저장했습니다.": "予定を保存しました。",
+  "메모를 저장했습니다.": "メモを保存しました。",
+  "Google 로그인을 확인해주세요.": "Googleログインを確認してください。",
+  "상태를 바꿨습니다.": "状態を変更しました。",
+  "이번 주 공유 코드를 복사했습니다.": "今週の共有コードをコピーしました。",
+  "친구 코드를 읽지 못했습니다.": "友だちのコードを読み取れませんでした。",
+  "언어를 변경했습니다.": "言語を変更しました。",
+  "동기화했습니다.": "同期しました。",
+  "이 브라우저는 알림을 지원하지 않습니다.": "このブラウザは通知に対応していません。",
+  "알림 권한이 켜졌습니다.": "通知権限が有効になりました。",
+  "알림 권한이 꺼져 있습니다.": "通知権限が無効です。",
+  "앱을 시작하지 못했습니다": "アプリを開始できませんでした",
+  "기타": "その他",
+  "공부": "勉強",
+  "운동": "運動",
+  "독서": "読書",
+  "프로젝트": "プロジェクト",
+  "생활": "生活",
+  "휴식": "休憩",
+  "회": "回"
 };
 
 const state = {
@@ -155,7 +199,32 @@ function applyTheme() {
 }
 
 function t(value) {
-  return state.language === "ja" ? JA_TEXT[value] || value : value;
+  return translateText(value);
+}
+
+function translateText(value) {
+  if (state.language !== "ja") return String(value ?? "");
+  let output = String(value ?? "");
+  const exact = JA_TEXT[output.trim()];
+  if (exact && output.trim() === output) return exact;
+  Object.entries(JA_TEXT)
+    .sort((a, b) => b[0].length - a[0].length)
+    .forEach(([ko, ja]) => {
+      output = output.split(ko).join(ja);
+    });
+  return output
+    .replace(/(\d{4})년\s*(\d{1,2})월/g, "$1年 $2月")
+    .replace(/(\d{1,2})월\s*(\d{1,2})일/g, "$1月$2日")
+    .replace(/(\d+)\s*개/g, "$1件")
+    .replace(/(\d+)\s*시간/g, "$1時間")
+    .replace(/(\d+)\s*분/g, "$1分")
+    .replace(/월요일/g, "月曜日")
+    .replace(/화요일/g, "火曜日")
+    .replace(/수요일/g, "水曜日")
+    .replace(/목요일/g, "木曜日")
+    .replace(/금요일/g, "金曜日")
+    .replace(/토요일/g, "土曜日")
+    .replace(/일요일/g, "日曜日");
 }
 
 function color(index = 0) {
@@ -531,6 +600,33 @@ async function refresh(message = "") {
 function render() {
   applyTheme();
   $("#mobileApp").innerHTML = state.ready && (state.user || state.offlineMode) ? appView() : loginView();
+  applyLanguage();
+}
+
+function applyLanguage() {
+  if (state.language !== "ja") return;
+  const root = $("#mobileApp");
+  if (!root) return;
+  const excludedSelector = "input, textarea, .mEvent, .noteMini, .goalMini";
+  const nodes = [];
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      const value = node.nodeValue.trim();
+      if (!value || translateText(value) === value) return NodeFilter.FILTER_REJECT;
+      if (node.parentElement?.closest(excludedSelector)) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    }
+  });
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  nodes.forEach((node) => {
+    const value = node.nodeValue.trim();
+    node.nodeValue = node.nodeValue.replace(value, translateText(value));
+  });
+  document.querySelectorAll("[placeholder]").forEach((element) => {
+    const value = element.getAttribute("placeholder");
+    const translated = translateText(value);
+    if (translated !== value) element.setAttribute("placeholder", translated);
+  });
 }
 
 document.addEventListener("click", async (event) => {

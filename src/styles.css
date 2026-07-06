@@ -48,6 +48,19 @@ button {
 button.full { width: 100%; justify-content: center; }
 button:hover { transform: translateY(-1px); }
 button:active { transform: translateY(0) scale(.985); }
+@keyframes softEnter {
+  from { opacity: 0; transform: translateY(8px) scale(.992); filter: blur(2px); }
+  to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+@keyframes sheetEnter {
+  from { opacity: 0; transform: translateY(14px) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes toastDrop {
+  0% { opacity: 0; transform: translate(-50%, -16px); }
+  14%, 86% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, -10px); }
+}
 #app {
   display: grid;
   grid-template-columns: 188px 1fr;
@@ -508,6 +521,9 @@ nav {
   scroll-behavior: smooth;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+}
+.content > * {
+  animation: softEnter .34s cubic-bezier(.16, 1, .3, 1);
 }
 .categoryStrip {
   display: flex;
@@ -1382,6 +1398,9 @@ td button {
   box-shadow: 0 32px 90px rgba(0, 0, 0, .24);
   animation: modalIn .28s cubic-bezier(.2, .9, .2, 1);
 }
+.modal {
+  animation: sheetEnter .28s cubic-bezier(.16, 1, .3, 1);
+}
 .modal header, .modal footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .modal h3 { margin: 0 0 14px; font-size: 24px; letter-spacing: -.04em; }
 .modal header button { padding: 0 12px; min-height: 32px; border-radius: 12px; background: var(--soft); }
@@ -1479,6 +1498,34 @@ td button {
   box-shadow: var(--shadow);
   transform: translateX(-50%);
   animation: toastIn .34s cubic-bezier(.16, 1, .3, 1);
+}
+.toast {
+  animation: toastDrop 3.2s cubic-bezier(.16, 1, .3, 1) both;
+}
+.card,
+.heroCard,
+.metric,
+.lane,
+.goalCard,
+.projectCard,
+.dreamCard,
+.eventRow,
+.taskCard,
+.mEvent {
+  transition: transform .24s cubic-bezier(.2, .8, .2, 1), box-shadow .24s ease, border-color .24s ease, background .24s ease;
+}
+.goalBar p i,
+.progress i,
+.goalMini p i {
+  transition: width .55s cubic-bezier(.16, 1, .3, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
 }
 .empty {
   min-height: 62px;

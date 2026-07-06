@@ -34,6 +34,19 @@ button {
   transition: transform .28s cubic-bezier(.2, .8, .2, 1), background .28s ease, border-color .28s ease, opacity .28s ease, box-shadow .28s ease;
 }
 button:active { transform: scale(.975); }
+@keyframes mobileEnter {
+  from { opacity: 0; transform: translateY(10px) scale(.992); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes mobileSheet {
+  from { opacity: 0; transform: translateY(22px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes mobileToast {
+  0% { opacity: 0; transform: translate(-50%, -18px); }
+  14%, 86% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, -12px); }
+}
 button, input, select, textarea {
   touch-action: manipulation;
 }
@@ -190,6 +203,9 @@ html, body, * { scrollbar-width: none; }
   overflow: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+}
+.mContent > * {
+  animation: mobileEnter .32s cubic-bezier(.16, 1, .3, 1);
 }
 .dayStack,
 .mainStack {
@@ -614,6 +630,9 @@ html, body, * { scrollbar-width: none; }
   background: var(--card);
   box-shadow: var(--shadow);
 }
+.bottomSheet {
+  animation: mobileSheet .28s cubic-bezier(.16, 1, .3, 1);
+}
 .bottomSheet header {
   display: flex;
   justify-content: space-between;
@@ -701,6 +720,27 @@ html, body, * { scrollbar-width: none; }
   box-shadow: var(--shadow);
   pointer-events: none;
   animation: mToastIn 3s cubic-bezier(.2, .8, .2, 1) both;
+}
+.mToast {
+  animation: mobileToast 3s cubic-bezier(.16, 1, .3, 1) both;
+}
+.mobileCard,
+.mEvent,
+.noteMini,
+.goalMini,
+.monthDay {
+  transition: transform .24s cubic-bezier(.2, .8, .2, 1), border-color .24s ease, background .24s ease, box-shadow .24s ease;
+}
+.goalMini p i {
+  transition: width .55s cubic-bezier(.16, 1, .3, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
 }
 .mEmpty {
   min-height: 70px;
